@@ -1,4 +1,4 @@
-# MatricX-Cowork v2.0 ⚡
+# MatricX-Cowork v0.3.0 ⚡
 
 High-performance, visual ambient coworking simulation and mouse automation utility for Windows built in C++17 with Direct Win32 & GDI+.
 
@@ -6,7 +6,7 @@ Designed for coworking simulation, active session keep-alive, or ambient screen 
 
 ---
 
-## ✨ Features
+## ✨ Features (v0.3.0)
 
 - **🖱️ Organic Bézier Motion**: Smooth cubic Bézier trajectories with variable perpendicular offsets and smoothstep easing instead of linear steps.
 - **🤏 Human-like Micro-Jitter**: Simulates micro-vibrations during dwell pauses (mimicking a hand resting on a physical mouse).

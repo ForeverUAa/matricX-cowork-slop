@@ -25,7 +25,7 @@
 // Constants & Version
 // ============================================================================
 
-static const char* VERSION_STRING = "matricX-cowork 2.0.0";
+static const char* VERSION_STRING = "matricX-cowork 0.3.0";
 static const UINT_PTR TIMER_ID = 1;
 static const int TIMER_INTERVAL_MS = 10;
 static const int GLOW_FPS_DIVISOR = 5; // every 5th tick = ~50ms = 20fps
