@@ -12,9 +12,9 @@ $env:Path = "C:\msys64\ucrt64\bin;$env:Path"
 if ($Clean -and (Test-Path $build)) { Remove-Item $build -Recurse -Force }
 New-Item -ItemType Directory -Force $obj | Out-Null
 
-$cflags = @((& pkg-config --cflags Qt6Widgets Qt6Svg) -split '\s+' | Where-Object { $_ })
-if ($LASTEXITCODE -ne 0) { throw 'Qt 6 Widgets/Svg not found. Run scripts\install-packages.ps1 first.' }
-$libs = @((& pkg-config --libs Qt6Widgets Qt6Svg) -split '\s+' | Where-Object { $_ })
+$cflags = @((& pkg-config --cflags Qt6Widgets Qt6Svg Qt6Network) -split '\s+' | Where-Object { $_ })
+if ($LASTEXITCODE -ne 0) { throw 'Qt 6 Widgets/Svg/Network not found. Run scripts\install-packages.ps1 first.' }
+$libs = @((& pkg-config --libs Qt6Widgets Qt6Svg Qt6Network) -split '\s+' | Where-Object { $_ })
 
 $newestHeader = (Get-ChildItem $src -Recurse -Filter *.h | Measure-Object LastWriteTime -Maximum).Maximum
 $objects = @()

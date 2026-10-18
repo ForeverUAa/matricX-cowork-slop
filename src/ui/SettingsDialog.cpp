@@ -179,7 +179,8 @@ void SettingsDialog::loadProvider(const QString &providerId) {
     auto &sm = SettingsManager::instance();
 
     m_apiKeyEdit->setText(sm.apiKey(providerId));
-    m_baseUrlEdit->setText(sm.customBaseUrl(providerId));
+    m_baseUrlEdit->setText(sm.rawCustomBaseUrl(providerId));
+    m_baseUrlEdit->setPlaceholderText(cfg.defaultBaseUrl);
 
     m_modelCombo->clear();
     for (const auto &m : cfg.models) {

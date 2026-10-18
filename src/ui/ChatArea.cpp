@@ -158,13 +158,62 @@ void ChatArea::addMessage(const QString &text, bool fromUser) {
 
 void ChatArea::send() {
     const QString t = m_input->text().trimmed();
-    if (t.isEmpty()) return;
+    if (t.isEmpty() || m_busy) return;
     m_input->clear();
     m_hasMessages = true;
     update();
+
     addMessage(t, true);
-    addMessage("AI backend isn't connected yet.", false);
+    m_history.append({"user", t});
+
+    runAgentLoop();
+}
+
+void ChatArea::runAgentLoop() {
+    m_busy = true;
+    m_input->setEnabled(false);
+
+    QJsonArray tools = m_tool.definitions();
+
+    m_ai.sendMessage(m_history, tools, [this](const AiResponse &resp) {
+        if (!resp.success) {
+            m_busy = false;
+            m_input->setEnabled(true);
+            m_input->setFocus();
+            addMessage(QString("Error: %1").arg(resp.errorMessage), false);
+            return;
+        }
+
+        if (!resp.text.isEmpty()) {
+            addMessage(resp.text, false);
+            m_history.append({"assistant", resp.text});
+        }
+
+        if (resp.toolCalls.isEmpty()) {
+            m_busy = false;
+            m_input->setEnabled(true);
+            m_input->setFocus();
+            return;
+        }
+
+        executeNextToolCall(resp.toolCalls, 0);
+    });
+}
+
+void ChatArea::executeNextToolCall(const QList<ToolCallRequest> &calls, int index) {
+    if (index >= calls.size()) {
+        runAgentLoop();
+        return;
+    }
+
+    const auto &tc = calls[index];
+    addMessage(QString("⚙ Running tool: %1").arg(tc.name), false);
+
+    m_tool.call(tc.name, tc.arguments, [this, calls, index, tc](const QJsonObject &reply) {
+        QString toolResultStr = QString::fromUtf8(QJsonDocument(reply).toJson(QJsonDocument::Compact));
+        m_history.append({"user", QString("Tool result for %1: %2").arg(tc.name, toolResultStr)});
+        executeNextToolCall(calls, index + 1);
+    });
 }
 
 }  // namespace mcw
-

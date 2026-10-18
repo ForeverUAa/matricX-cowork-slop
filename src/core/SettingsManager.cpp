@@ -17,7 +17,7 @@ const QList<ProviderConfig> &SettingsManager::availableProviders() {
             "gemini",
             "Google Gemini",
             "https://generativelanguage.googleapis.com",
-            {"gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"},
+            {"gemini-2.5-flash", "gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-flash-latest", "gemini-pro-latest"},
             "gemini-2.5-flash",
             "https://aistudio.google.com/apikey"
         },
@@ -103,7 +103,14 @@ QString SettingsManager::customBaseUrl(const QString &providerId) const {
     const QString pid = providerId.isEmpty() ? provider() : providerId;
     const auto cfg = providerConfig(pid);
     QSettings s("MCowork", "MCowork");
-    return s.value(QString("ai/%1/baseUrl").arg(pid), cfg.defaultBaseUrl).toString();
+    const QString val = s.value(QString("ai/%1/baseUrl").arg(pid), QString()).toString().trimmed();
+    return val.isEmpty() ? cfg.defaultBaseUrl : val;
+}
+
+QString SettingsManager::rawCustomBaseUrl(const QString &providerId) const {
+    const QString pid = providerId.isEmpty() ? provider() : providerId;
+    QSettings s("MCowork", "MCowork");
+    return s.value(QString("ai/%1/baseUrl").arg(pid), QString()).toString();
 }
 
 void SettingsManager::setCustomBaseUrl(const QString &url, const QString &providerId) {

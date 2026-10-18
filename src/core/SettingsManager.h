@@ -31,6 +31,7 @@ public:
     void setModel(const QString &model, const QString &providerId = QString());
 
     QString customBaseUrl(const QString &providerId = QString()) const;
+    QString rawCustomBaseUrl(const QString &providerId = QString()) const;
     void setCustomBaseUrl(const QString &url, const QString &providerId = QString());
 
     QString activeBaseUrl() const;
