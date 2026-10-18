@@ -90,6 +90,14 @@ QString svgString(IconType type, const QColor &color, float strokeWidth) {
             "<path d=\"M15 2v2\"/><path d=\"M15 20v2\"/><path d=\"M2 15h2\"/><path d=\"M2 9h2\"/>"
             "<path d=\"M20 15h2\"/><path d=\"M20 9h2\"/><path d=\"M9 2v2\"/><path d=\"M9 20v2\"/>");
         break;
+    case IconType::Bot:
+        // Lucide: bot
+        pathData = QString(
+            "<path d=\"M12 8V4H8\"/>"
+            "<rect width=\"16\" height=\"12\" x=\"4\" y=\"8\" rx=\"2\"/>"
+            "<path d=\"M2 14h2\"/><path d=\"M20 14h2\"/>"
+            "<path d=\"M15 13v2\"/><path d=\"M9 13v2\"/>");
+        break;
     case IconType::Key:
         pathData = QString(
             "<path d=\"m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4\"/>"

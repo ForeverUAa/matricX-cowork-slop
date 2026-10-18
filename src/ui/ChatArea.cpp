@@ -39,10 +39,6 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     top->setContentsMargins(20, 12, 16, 0);
     top->setSpacing(12);
 
-    // In-chat model indicator & selector
-    m_modelSelector = new ModelSelector(this);
-    top->addWidget(m_modelSelector, 0, Qt::AlignVCenter);
-
     // Agent status pill
     m_statusPill = new QLabel(this);
     m_statusPill->setFixedHeight(26);
@@ -123,6 +119,10 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     divider->setStyleSheet("background: #3e3e46; border: none;");
     barLayout->addWidget(divider);
 
+    // In-chat model indicator & selector placed right in the chatbox next to the mic button
+    m_modelSelector = new ModelSelector(this);
+    barLayout->addWidget(m_modelSelector);
+
     // Prototype accent recolored microphone
     m_micBtn = new MicButton(this);
     barLayout->addWidget(m_micBtn);
@@ -137,6 +137,11 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
         } else {
             m_micBtn->setState(MicButton::Recording);
         }
+    });
+
+    connect(m_modelSelector, &ModelSelector::modelChanged, this, [this](const QString &providerId, const QString &model) {
+        const QString currentSid = SessionManager::instance().currentSessionId();
+        SessionManager::instance().setSessionModel(currentSid, providerId, model);
     });
 
     // Theme changes
@@ -225,6 +230,12 @@ void ChatArea::loadCurrentSession() {
 
     if (!s.provider.isEmpty() && !s.model.isEmpty()) {
         m_modelSelector->setSelectedModel(s.provider, s.model);
+        SettingsManager::instance().setProvider(s.provider);
+        SettingsManager::instance().setModel(s.model, s.provider);
+    } else {
+        const QString p = SettingsManager::instance().provider();
+        const QString m = SettingsManager::instance().model(p);
+        m_modelSelector->setSelectedModel(p, m);
     }
     update();
 }

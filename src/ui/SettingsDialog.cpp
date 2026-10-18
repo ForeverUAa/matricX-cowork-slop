@@ -197,7 +197,7 @@ void SettingsDialog::refreshProviderCards() {
         cardLayout->setContentsMargins(14, 12, 14, 12);
         cardLayout->setSpacing(8);
 
-        // Header Row: Chevron, Name, Status, Select Active
+        // Header Row: Chevron, Name, Status
         auto *headerRow = new QHBoxLayout;
         auto *chevronBtn = new QPushButton;
         chevronBtn->setIcon(icons::icon(icons::IconType::ChevronRight, QColor(160, 160, 160)));
@@ -218,17 +218,6 @@ void SettingsDialog::refreshProviderCards() {
         headerRow->addWidget(badge);
         headerRow->addStretch();
 
-        auto *useBtn = new QPushButton(isSelected ? "Active" : "Set Active");
-        useBtn->setEnabled(!isSelected);
-        useBtn->setFixedHeight(26);
-        useBtn->setStyleSheet(isSelected
-            ? "background: #10b981; color: #ffffff; border: none; border-radius: 4px; font-size: 12px; font-weight: bold; padding: 0 10px;"
-            : "background: #374151; color: #d1d5db; border: none; border-radius: 4px; font-size: 12px; font-weight: 500; padding: 0 10px;");
-        connect(useBtn, &QPushButton::clicked, this, [this, p] {
-            SettingsManager::instance().setProvider(p.id);
-            refreshProviderCards();
-        });
-        headerRow->addWidget(useBtn);
         cardLayout->addLayout(headerRow);
 
         // Expandable details container

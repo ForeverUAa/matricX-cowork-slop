@@ -10,22 +10,23 @@ namespace mcw {
 
 ModelSelector::ModelSelector(QWidget *parent) : QWidget(parent) {
     auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(6, 2, 6, 2);
+    layout->setContentsMargins(4, 2, 4, 2);
     layout->setSpacing(6);
 
     m_iconLabel = new QLabel(this);
-    m_iconLabel->setFixedSize(16, 16);
+    m_iconLabel->setFixedSize(18, 18);
     layout->addWidget(m_iconLabel);
 
     m_combo = new QComboBox(this);
     m_combo->setEditable(true);
     m_combo->setInsertPolicy(QComboBox::NoInsert);
-    m_combo->setMinimumWidth(180);
-    m_combo->setFixedHeight(26);
+    m_combo->setMinimumWidth(160);
+    m_combo->setMaximumWidth(230);
+    m_combo->setFixedHeight(28);
 
     // Make lineEdit search-friendly
     if (m_combo->lineEdit()) {
-        m_combo->lineEdit()->setPlaceholderText("Select model...");
+        m_combo->lineEdit()->setPlaceholderText("Search model...");
         m_combo->completer()->setFilterMode(Qt::MatchContains);
         m_combo->completer()->setCaseSensitivity(Qt::CaseInsensitive);
     }
@@ -43,7 +44,8 @@ void ModelSelector::refreshModels() {
     const bool dark = ThemeManager::instance().isDark();
     const auto &c = ThemeManager::instance().colors();
 
-    m_iconLabel->setPixmap(icons::pixmap(icons::IconType::Cpu, QSize(14, 14), c.accent));
+    // Use Bot icon for AI model representation
+    m_iconLabel->setPixmap(icons::pixmap(icons::IconType::Bot, QSize(16, 16), c.accent));
 
     m_combo->setStyleSheet(QString(
         "QComboBox {"
@@ -60,7 +62,7 @@ void ModelSelector::refreshModels() {
         "}"
         "QComboBox::drop-down {"
         "  border: none;"
-        "  width: 16px;"
+        "  width: 14px;"
         "}"
         "QComboBox QAbstractItemView {"
         "  background: %1;"
@@ -69,8 +71,8 @@ void ModelSelector::refreshModels() {
         "  selection-background-color: %4;"
         "  selection-color: #ffffff;"
         "}"
-    ).arg(dark ? "#1e2229" : "#f1f5f9",
-          dark ? "#374151" : "#cbd5e1",
+    ).arg(dark ? "#26262b" : "#f1f5f9",
+          dark ? "#3f3f46" : "#cbd5e1",
           dark ? "#f3f4f6" : "#0f172a",
           c.accent.name()));
 
@@ -79,7 +81,7 @@ void ModelSelector::refreshModels() {
 
     m_combo->clear();
 
-    // Populate provider models
+    // Populate all available models grouped by provider
     for (const auto &p : SettingsManager::availableProviders()) {
         for (const auto &m : p.models) {
             const QString display = QString("%1: %2").arg(p.name, m);
@@ -96,11 +98,18 @@ QString ModelSelector::currentModel() const {
     return data.value("model").toString();
 }
 
+QString ModelSelector::currentProvider() const {
+    const auto data = m_combo->currentData().toMap();
+    return data.value("provider").toString();
+}
+
 void ModelSelector::setSelectedModel(const QString &providerId, const QString &model) {
     for (int i = 0; i < m_combo->count(); ++i) {
         const auto data = m_combo->itemData(i).toMap();
         if (data.value("provider").toString() == providerId && data.value("model").toString() == model) {
+            m_updating = true;
             m_combo->setCurrentIndex(i);
+            m_updating = false;
             return;
         }
     }

@@ -16,6 +16,7 @@ public:
 
     void refreshModels();
     QString currentModel() const;
+    QString currentProvider() const;
     void setSelectedModel(const QString &providerId, const QString &model);
 
 signals:

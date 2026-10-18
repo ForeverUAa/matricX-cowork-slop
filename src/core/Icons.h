@@ -26,6 +26,7 @@ enum class IconType {
     Check,
     X,
     Cpu,
+    Bot,
     Key,
     Sun,
     Moon,
