@@ -53,7 +53,7 @@ void ModelSelector::refreshModels() {
         "  border: 1px solid %2;"
         "  border-radius: 6px;"
         "  color: %3;"
-        "  padding: 2px 8px;"
+        "  padding: 2px 20px 2px 8px;"
         "  font-size: 12px;"
         "  font-weight: 500;"
         "}"
@@ -61,8 +61,21 @@ void ModelSelector::refreshModels() {
         "  border: 1px solid %4;"
         "}"
         "QComboBox::drop-down {"
-        "  border: none;"
-        "  width: 14px;"
+        "  subcontrol-origin: padding;"
+        "  subcontrol-position: top right;"
+        "  width: 20px;"
+        "  border-left: 1px solid %2;"
+        "  border-top-right-radius: 6px;"
+        "  border-bottom-right-radius: 6px;"
+        "  background: %5;"
+        "}"
+        "QComboBox::down-arrow {"
+        "  width: 0;"
+        "  height: 0;"
+        "  border-left: 4px solid transparent;"
+        "  border-right: 4px solid transparent;"
+        "  border-top: 5px solid %6;"
+        "  margin-right: 2px;"
         "}"
         "QComboBox QAbstractItemView {"
         "  background: %1;"
@@ -74,7 +87,9 @@ void ModelSelector::refreshModels() {
     ).arg(dark ? "#26262b" : "#f1f5f9",
           dark ? "#3f3f46" : "#cbd5e1",
           dark ? "#f3f4f6" : "#0f172a",
-          c.accent.name()));
+          c.accent.name(),
+          dark ? "#1f1f24" : "#e2e8f0",
+          dark ? "#9ca3af" : "#64748b"));
 
     const QString currentP = SettingsManager::instance().provider();
     const QString currentM = SettingsManager::instance().model(currentP);
