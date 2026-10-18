@@ -1,5 +1,9 @@
 # Drives matricX-cowork.exe over its JSON-lines protocol (safe commands only).
-$exe = Join-Path $PSScriptRoot 'matricX-cowork.exe'
+$root = Split-Path -Parent $PSScriptRoot
+$exe = Join-Path $root 'tools\matricX-cowork\matricX-cowork.exe'
+if (-not (Test-Path $exe)) {
+  & (Join-Path $PSScriptRoot 'build.ps1')
+}
 $psi = New-Object Diagnostics.ProcessStartInfo
 $psi.FileName = $exe; $psi.Arguments = '--no-lock --no-cursor --glow off --idle-timeout 30'
 $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.UseShellExecute = $false
