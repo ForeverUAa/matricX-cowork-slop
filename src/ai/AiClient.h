@@ -33,6 +33,7 @@ struct AiResponse {
 class AiClient {
 public:
     using ResponseCallback = std::function<void(const AiResponse &response)>;
+    using ModelsCallback = std::function<void(bool success, const QStringList &models, const QString &error)>;
 
     AiClient();
     ~AiClient();
@@ -41,6 +42,9 @@ public:
     void sendMessage(const QList<ChatMessage> &history,
                      const QJsonArray &toolDefinitions,
                      ResponseCallback callback);
+
+    // Queries provider endpoint to fetch available models for current API key
+    void fetchAvailableModels(const QString &providerId, ModelsCallback callback);
 
 private:
     void sendGemini(const QList<ChatMessage> &history,

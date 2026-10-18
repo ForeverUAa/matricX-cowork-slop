@@ -1,4 +1,5 @@
 #include "ai/AiClient.h"
+#include "ai/AntigravityAuth.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -43,14 +44,20 @@ void AiClient::sendGemini(const QList<ChatMessage> &history,
     QString baseUrl = sm.customBaseUrl("gemini");
     if (baseUrl.endsWith('/')) baseUrl.chop(1);
 
-    if (apiKey.isEmpty()) {
-        callback({false, QString(), {}, "Gemini API key is missing. Click the gear icon to set it."});
+    const bool useOAuth = apiKey.isEmpty() && AntigravityAuth::hasToken();
+    const QString token = useOAuth ? AntigravityAuth::accessToken() : apiKey;
+
+    if (token.isEmpty()) {
+        callback({false, QString(), {}, "Gemini API key or Google Antigravity login is required. Click the gear icon."});
         return;
     }
 
-    // Endpoint: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}
-    const QString urlStr = QString("%1/v1beta/models/%2:generateContent?key=%3")
-                               .arg(baseUrl, model, apiKey);
+    // Endpoint:
+    // With API Key: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}
+    // With OAuth Bearer: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+    const QString urlStr = useOAuth
+                               ? QString("%1/v1beta/models/%2:generateContent").arg(baseUrl, model)
+                               : QString("%1/v1beta/models/%2:generateContent?key=%3").arg(baseUrl, model, token);
 
     QJsonObject reqObj;
 
@@ -90,6 +97,9 @@ void AiClient::sendGemini(const QList<ChatMessage> &history,
 
     QNetworkRequest request{QUrl(urlStr)};
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    if (useOAuth) {
+        request.setRawHeader("Authorization", "Bearer " + token.toUtf8());
+    }
 
     QNetworkReply *reply = m_nam->post(request, QJsonDocument(reqObj).toJson());
     QObject::connect(reply, &QNetworkReply::finished, [reply, callback]() {
@@ -330,6 +340,106 @@ void AiClient::sendAnthropic(const QList<ChatMessage> &history,
         }
 
         callback(resp);
+    });
+}
+
+void AiClient::fetchAvailableModels(const QString &providerId, ModelsCallback callback) {
+    auto &sm = SettingsManager::instance();
+    const QString apiKey = sm.apiKey(providerId);
+    QString baseUrl = sm.customBaseUrl(providerId);
+    if (baseUrl.endsWith('/')) baseUrl.chop(1);
+
+    if (providerId == "gemini") {
+        const bool useOAuth = apiKey.isEmpty() && AntigravityAuth::hasToken();
+        const QString token = useOAuth ? AntigravityAuth::accessToken() : apiKey;
+        if (token.isEmpty()) {
+            callback(false, {}, "Missing Gemini API key or Antigravity login.");
+            return;
+        }
+        const QString url = useOAuth
+                                ? QString("%1/v1beta/models").arg(baseUrl)
+                                : QString("%1/v1beta/models?key=%2").arg(baseUrl, token);
+        QNetworkRequest req{QUrl(url)};
+        if (useOAuth) {
+            req.setRawHeader("Authorization", "Bearer " + token.toUtf8());
+        }
+        QNetworkReply *reply = m_nam->get(req);
+        QObject::connect(reply, &QNetworkReply::finished, [reply, callback]() {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) {
+                callback(false, {}, reply->errorString());
+                return;
+            }
+            const auto doc = QJsonDocument::fromJson(reply->readAll());
+            const auto arr = doc.object().value("models").toArray();
+            QStringList models;
+            for (const auto &mVal : arr) {
+                QString name = mVal.toObject().value("name").toString();
+                if (name.startsWith("models/")) name = name.mid(7);
+                models.append(name);
+            }
+            callback(true, models, QString());
+        });
+        return;
+    }
+
+    if (providerId == "anthropic") {
+        if (apiKey.isEmpty()) {
+            callback(false, {}, "Missing Anthropic API key.");
+            return;
+        }
+        QNetworkRequest req{QUrl(baseUrl + "/models")};
+        req.setRawHeader("x-api-key", apiKey.toUtf8());
+        req.setRawHeader("anthropic-version", "2023-06-01");
+        QNetworkReply *reply = m_nam->get(req);
+        QObject::connect(reply, &QNetworkReply::finished, [reply, callback]() {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) {
+                callback(false, {}, reply->errorString());
+                return;
+            }
+            const auto doc = QJsonDocument::fromJson(reply->readAll());
+            const auto data = doc.object().value("data").toArray();
+            QStringList models;
+            for (const auto &mVal : data) {
+                models.append(mVal.toObject().value("id").toString());
+            }
+            callback(true, models, QString());
+        });
+        return;
+    }
+
+    // OpenAI, DeepSeek, OpenRouter, Groq, Ollama
+    if (apiKey.isEmpty() && providerId != "ollama") {
+        callback(false, {}, QString("Missing %1 API key.").arg(providerId));
+        return;
+    }
+
+    QNetworkRequest req{QUrl(baseUrl + "/models")};
+    if (!apiKey.isEmpty()) {
+        req.setRawHeader("Authorization", "Bearer " + apiKey.toUtf8());
+    }
+    QNetworkReply *reply = m_nam->get(req);
+    QObject::connect(reply, &QNetworkReply::finished, [reply, callback]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            callback(false, {}, reply->errorString());
+            return;
+        }
+        const auto doc = QJsonDocument::fromJson(reply->readAll());
+        const auto root = doc.object();
+        QJsonArray data = root.value("data").toArray();
+        if (data.isEmpty() && root.contains("models")) {
+            data = root.value("models").toArray();
+        }
+        QStringList models;
+        for (const auto &mVal : data) {
+            const auto obj = mVal.toObject();
+            QString id = obj.value("id").toString();
+            if (id.isEmpty()) id = obj.value("name").toString();
+            if (!id.isEmpty()) models.append(id);
+        }
+        callback(true, models, QString());
     });
 }
 

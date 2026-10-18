@@ -29,10 +29,19 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // window controls (top-right)
+    // window controls & status indicator (top)
     auto *top = new QHBoxLayout;
-    top->setContentsMargins(0, 12, 15, 0);
-    top->setSpacing(0);
+    top->setContentsMargins(24, 14, 18, 0);
+    top->setSpacing(12);
+
+    m_statusPill = new QLabel(this);
+    m_statusPill->setFixedHeight(26);
+    m_statusPill->setStyleSheet(
+        "background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(56, 189, 248, 0.3);"
+        "border-radius: 13px; color: #38bdf8; font-size: 12px; font-weight: 600; padding: 0 12px;");
+    m_statusPill->hide();
+    top->addWidget(m_statusPill, 0, Qt::AlignVCenter);
+
     top->addStretch();
     m_controls = new WindowControls;
     top->addWidget(m_controls, 0, Qt::AlignTop);
@@ -46,7 +55,8 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     m_scroll->setStyleSheet(
         "QScrollArea{background:transparent;border:none;}"
         "QScrollBar:vertical{background:transparent;width:8px;margin:2px;}"
-        "QScrollBar::handle:vertical{background:#2f6b27;border-radius:4px;min-height:30px;}"
+        "QScrollBar::handle:vertical{background:rgba(34, 197, 94, 0.4);border-radius:4px;min-height:30px;}"
+        "QScrollBar::handle:vertical:hover{background:rgba(34, 197, 94, 0.7);}"
         "QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0;}");
     m_scroll->viewport()->setAutoFillBackground(false);
     auto *content = new QWidget;
@@ -54,7 +64,7 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     content->setStyleSheet("#msgContent{background:transparent;}");
     m_msgLayout = new QVBoxLayout(content);
     m_msgLayout->setContentsMargins(60, 10, 60, 10);
-    m_msgLayout->setSpacing(10);
+    m_msgLayout->setSpacing(12);
     m_msgLayout->addStretch();
     m_scroll->setWidget(content);
     root->addWidget(m_scroll, 1);
@@ -62,39 +72,62 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     // input bar
     auto *barRow = new QHBoxLayout;
     barRow->setContentsMargins(60, 8, 60, 25);
-    auto *bar = new QFrame;
-    bar->setObjectName("bar");
-    bar->setFixedHeight(66);
-    bar->setStyleSheet(QString("QFrame#bar{background:%1;border:5px solid %2;border-radius:14px;}")
-                           .arg(theme::kInputInner.name(), theme::kInputBorder.name()));
-    auto *barLayout = new QHBoxLayout(bar);
-    barLayout->setContentsMargins(10, 0, 10, 0);
-    barLayout->setSpacing(8);
+    m_inputBar = new QFrame;
+    m_inputBar->setObjectName("bar");
+    m_inputBar->setFixedHeight(66);
+    m_inputBar->setStyleSheet(
+        "QFrame#bar {"
+        "  background: #242424;"
+        "  border: 2px solid #383838;"
+        "  border-radius: 14px;"
+        "  transition: border 0.3s ease;"
+        "}"
+        "QFrame#bar:focus-within {"
+        "  border: 2px solid #10b981;"
+        "  background: #282828;"
+        "}");
+    auto *barLayout = new QHBoxLayout(m_inputBar);
+    barLayout->setContentsMargins(12, 0, 12, 0);
+    barLayout->setSpacing(10);
 
     m_input = new QLineEdit;
-    m_input->setPlaceholderText("Type your message here...");
-    m_input->setStyleSheet(QString("QLineEdit{background:transparent;border:none;color:%1;"
-                                   "font-size:21px;padding-left:12px;}")
-                               .arg(theme::kInputText.name()));
+    m_input->setPlaceholderText("Ask M-Cowork anything, or type /tools...");
+    m_input->setStyleSheet(
+        "QLineEdit {"
+        "  background: transparent;"
+        "  border: none;"
+        "  color: #f1f5f9;"
+        "  font-size: 17px;"
+        "  padding-left: 8px;"
+        "}");
     QPalette pal = m_input->palette();
-    pal.setColor(QPalette::PlaceholderText, theme::kInputPlaceholder);
+    pal.setColor(QPalette::PlaceholderText, QColor(140, 140, 150));
     m_input->setPalette(pal);
     barLayout->addWidget(m_input, 1);
 
     auto *divider = new QFrame;
-    divider->setFixedSize(6, 36);
-    divider->setStyleSheet(
-        QString("background:%1;border:none;border-radius:3px;").arg(theme::kInputDivider.name()));
+    divider->setFixedSize(2, 28);
+    divider->setStyleSheet("background: #3e3e3e; border: none;");
     barLayout->addWidget(divider);
 
     auto *mic = new IconButton(assets::path("icons/mic.svg"), assets::path("icons/mic-hover.svg"),
-                               QSize(46, 46), QSize(46, 46), QColor(0, 0, 0, 0));
+                               QSize(44, 44), QSize(36, 36), QColor(0, 0, 0, 0));
     barLayout->addWidget(mic);
 
-    barRow->addWidget(bar);
+    barRow->addWidget(m_inputBar);
     root->addLayout(barRow);
 
     connect(m_input, &QLineEdit::returnPressed, this, [this] { send(); });
+
+    // Background pulse timer (~30 FPS for gentle glow animation)
+    connect(&m_animTimer, &QTimer::timeout, this, [this] {
+        m_pulsePhase += 0.04f;
+        if (m_pulsePhase > 6.28318f) m_pulsePhase -= 6.28318f;
+        if (!m_hasMessages || m_busy) {
+            update();
+        }
+    });
+    m_animTimer.start(33);
 }
 
 void ChatArea::focusInput() { m_input->setFocus(); }
@@ -102,6 +135,24 @@ void ChatArea::focusInput() { m_input->setFocus(); }
 void ChatArea::setCornerRadius(int radius) {
     m_radius = radius;
     update();
+}
+
+void ChatArea::updateStatusIndicator(const QString &text, bool active) {
+    if (text.isEmpty()) {
+        m_statusPill->hide();
+    } else {
+        m_statusPill->setText(text);
+        if (active) {
+            m_statusPill->setStyleSheet(
+                "background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.5);"
+                "border-radius: 13px; color: #34d399; font-size: 12px; font-weight: 600; padding: 0 12px;");
+        } else {
+            m_statusPill->setStyleSheet(
+                "background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(56, 189, 248, 0.3);"
+                "border-radius: 13px; color: #38bdf8; font-size: 12px; font-weight: 600; padding: 0 12px;");
+        }
+        m_statusPill->show();
+    }
 }
 
 void ChatArea::paintEvent(QPaintEvent *) {
@@ -112,41 +163,54 @@ void ChatArea::paintEvent(QPaintEvent *) {
     QPainterPath clip;
     clip.addRoundedRect(QRectF(-m_radius, 0, width() + m_radius, height()), m_radius, m_radius);
     p.setClipPath(clip);
-    p.fillRect(rect(), Qt::black);
+    p.fillRect(rect(), QColor(14, 14, 15));
 
-    const double gy = height() * 0.76;
+    // Smooth ambient bottom gradient with gentle sine pulsing
+    const float pulse = 0.85f + 0.15f * std::sin(m_pulsePhase);
+    const double gy = height() * 0.70;
     QLinearGradient g(0, gy, 0, height());
-    g.setColorAt(0, QColor(0, 0, 0));
-    g.setColorAt(1, theme::kGradientBottom);
+    g.setColorAt(0, QColor(14, 14, 15, 0));
+    g.setColorAt(0.6, QColor(8, 45, 15, int(80 * pulse)));
+    g.setColorAt(1, QColor(16, 150, 40, int(130 * pulse)));
     p.fillRect(QRectF(0, gy, width(), height() - gy + 1), QBrush(g));
 
     if (!m_hasMessages) {
         QFont f;
-        f.setFamilies({"Rockwell", "Rockwell Extra Bold", "Georgia"});
+        f.setFamilies({"Rockwell", "Rockwell Extra Bold", "Segoe UI", "Georgia"});
         f.setBold(true);
-        f.setPixelSize(std::max(40, int(width() * 0.1)));
+        f.setPixelSize(std::max(38, int(width() * 0.085)));
         QPainterPath path;
         path.addText(0, 0, f, "M-Cowork");
         const QRectF br = path.boundingRect();
-        path.translate(width() * 0.5 - br.center().x(), height() * 0.33 - br.center().y());
-        p.setPen(QPen(theme::kTitleOutline, 6, Qt::SolidLine, Qt::RoundCap, Qt::MiterJoin));
-        p.setBrush(theme::kTitleFill);
+        path.translate(width() * 0.5 - br.center().x(), height() * 0.34 - br.center().y());
+        
+        // Layered glow effect behind title
+        QPen outlinePen(QColor(16, 185, 129, int(180 * pulse)), 5, Qt::SolidLine, Qt::RoundCap, Qt::MiterJoin);
+        p.setPen(outlinePen);
+        p.setBrush(QColor(24, 24, 26));
         p.drawPath(path);
+
+        // Subtitle slogan
+        QFont subFont("Segoe UI", 13);
+        p.setFont(subFont);
+        p.setPen(QColor(140, 140, 150));
+        const QString sub = "Autonomous Desktop Operator & AI Co-worker";
+        p.drawText(QRectF(0, height() * 0.34 + br.height() * 0.5 + 16, width(), 30), Qt::AlignCenter, sub);
     }
 }
 
 void ChatArea::addMessage(const QString &text, bool fromUser) {
     auto *lbl = new QLabel(text);
     lbl->setWordWrap(true);
-    lbl->setMaximumWidth(560);
+    lbl->setMaximumWidth(580);
     lbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
     lbl->setStyleSheet(
-        fromUser ? QString("background:%1;color:#ffffff;border:1px solid %2;border-radius:12px;"
-                           "padding:10px 14px;font-size:16px;")
-                       .arg(theme::kUserBubbleBg.name(), theme::kUserBubbleBorder.name())
-                 : QString("background:%1;color:%2;border-radius:12px;padding:10px 14px;font-size:16px;")
-                       .arg(theme::kBotBubbleBg.name(), theme::kBotBubbleText.name()));
+        fromUser ? "background: #064e3b; color: #ecfdf5; border: 1px solid #059669; border-radius: 12px;"
+                   "padding: 11px 16px; font-size: 15px; font-weight: 500; line-height: 1.4;"
+                 : "background: #1f2937; color: #f3f4f6; border: 1px solid #374151; border-radius: 12px;"
+                   "padding: 11px 16px; font-size: 15px; line-height: 1.4;");
     auto *row = new QHBoxLayout;
+    row->setContentsMargins(0, 0, 0, 0);
     if (fromUser) row->addStretch();
     row->addWidget(lbl);
     if (!fromUser) row->addStretch();
@@ -248,6 +312,7 @@ void ChatArea::send() {
 void ChatArea::runAgentLoop() {
     m_busy = true;
     m_input->setEnabled(false);
+    updateStatusIndicator("Thinking...", false);
 
     QJsonArray tools = m_tool.definitions();
 
@@ -256,6 +321,7 @@ void ChatArea::runAgentLoop() {
             m_busy = false;
             m_input->setEnabled(true);
             m_input->setFocus();
+            updateStatusIndicator(QString(), false);
             addMessage(QString("Error: %1").arg(resp.errorMessage), false);
             return;
         }
@@ -269,6 +335,7 @@ void ChatArea::runAgentLoop() {
             m_busy = false;
             m_input->setEnabled(true);
             m_input->setFocus();
+            updateStatusIndicator(QString(), false);
             return;
         }
 
@@ -283,6 +350,7 @@ void ChatArea::executeNextToolCall(const QList<ToolCallRequest> &calls, int inde
     }
 
     const auto &tc = calls[index];
+    updateStatusIndicator(QString("Executing: %1").arg(tc.name), true);
     addMessage(QString("⚙ Running tool: %1").arg(tc.name), false);
 
     m_tool.call(tc.name, tc.arguments, [this, calls, index, tc](const QJsonObject &reply) {

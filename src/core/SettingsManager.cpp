@@ -15,11 +15,27 @@ const QList<ProviderConfig> &SettingsManager::availableProviders() {
     static const QList<ProviderConfig> s_providers = {
         {
             "gemini",
-            "Google Gemini",
+            "Google Gemini / Antigravity",
             "https://generativelanguage.googleapis.com",
             {"gemini-2.5-flash", "gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-flash-latest", "gemini-pro-latest"},
             "gemini-2.5-flash",
             "https://aistudio.google.com/apikey"
+        },
+        {
+            "deepseek",
+            "DeepSeek",
+            "https://api.deepseek.com",
+            {"deepseek-chat", "deepseek-reasoner"},
+            "deepseek-chat",
+            "https://platform.deepseek.com/api_keys"
+        },
+        {
+            "openrouter",
+            "OpenRouter",
+            "https://openrouter.ai/api/v1",
+            {"deepseek/deepseek-chat", "deepseek/deepseek-r1", "anthropic/claude-3.7-sonnet", "google/gemini-2.5-flash", "openai/gpt-4o"},
+            "deepseek/deepseek-chat",
+            "https://openrouter.ai/keys"
         },
         {
             "openai",
