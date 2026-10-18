@@ -1,12 +1,18 @@
 #include "ui/Sidebar.h"
 
+#include <QEasingCurve>
+#include <QEvent>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPaintEvent>
+#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QStyle>
 #include <QVBoxLayout>
 
 #include "core/Icons.h"
@@ -21,6 +27,10 @@ Sidebar::Sidebar(QWidget *parent) : QWidget(parent) {
     setObjectName("sidebar");
     setAttribute(Qt::WA_StyledBackground, true);
     setFixedWidth(theme::kSidebarWidth);
+
+    m_pillAnimation = new QPropertyAnimation(this, "pillGeometry", this);
+    m_pillAnimation->setDuration(220);
+    m_pillAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
     auto *v = new QVBoxLayout(this);
     v->setContentsMargins(12, 16, 12, 16);
@@ -72,9 +82,9 @@ Sidebar::Sidebar(QWidget *parent) : QWidget(parent) {
     m_settingsBtn->setCursor(Qt::PointingHandCursor);
     m_settingsBtn->setStyleSheet(
         "QPushButton {"
-        "  background: #242429;"
+        "  background: transparent;"
         "  color: #e5e7eb;"
-        "  border: 1px solid #333338;"
+        "  border: none;"
         "  border-radius: 6px;"
         "  text-align: left;"
         "  padding-left: 12px;"
@@ -82,9 +92,9 @@ Sidebar::Sidebar(QWidget *parent) : QWidget(parent) {
         "  font-weight: 500;"
         "}"
         "QPushButton:hover {"
-        "  background: #2e2e36;"
         "  color: #ffffff;"
         "}");
+    registerNavTarget(m_settingsBtn);
     v->addWidget(m_settingsBtn);
 
     setCornerRadius(theme::kWindowRadius);
@@ -106,6 +116,12 @@ void Sidebar::setCornerRadius(int radius) {
 }
 
 void Sidebar::refreshSessions() {
+    m_pillAnimation->stop();
+    m_selectedTarget.clear();
+    m_navTargets.clear();
+    m_pillVisible = false;
+    registerNavTarget(m_settingsBtn);
+
     // Clear existing buttons except the final stretch
     while (m_sessionListLayout->count() > 1) {
         QLayoutItem *item = m_sessionListLayout->takeAt(0);
@@ -122,19 +138,12 @@ void Sidebar::refreshSessions() {
         auto *itemFrame = new QFrame;
         itemFrame->setObjectName("sessionCard");
         itemFrame->setFixedHeight(36);
-        itemFrame->setStyleSheet(QString(
+        itemFrame->setStyleSheet(
             "QFrame#sessionCard {"
-            "  background: %1;"
-            "  border: 1px solid %2;"
+            "  background: transparent;"
+            "  border: none;"
             "  border-radius: 6px;"
-            "}"
-            "QFrame#sessionCard:hover {"
-            "  background: %3;"
-            "}"
-        ).arg(isCurrent ? "rgba(16, 185, 129, 0.14)" : "#1c1c20",
-              isCurrent ? "rgba(16, 185, 129, 0.4)" : "transparent",
-              isCurrent ? "rgba(16, 185, 129, 0.22)" : "#26262c"));
-
+            "}");
         auto *row = new QHBoxLayout(itemFrame);
         row->setContentsMargins(10, 0, 4, 0);
         row->setSpacing(6);
@@ -160,8 +169,78 @@ void Sidebar::refreshSessions() {
         });
         row->addWidget(menuBtn);
 
+        registerNavTarget(itemFrame);
         m_sessionListLayout->insertWidget(m_sessionListLayout->count() - 1, itemFrame);
+        if (isCurrent) m_selectedTarget = itemFrame;
     }
+
+    if (m_selectedTarget) movePillTo(m_selectedTarget, true);
+}
+
+void Sidebar::registerNavTarget(QWidget *target) {
+    target->setAttribute(Qt::WA_Hover, true);
+    target->installEventFilter(this);
+    m_navTargets.insert(target, target);
+
+    const auto children = target->findChildren<QWidget *>();
+    for (QWidget *child : children) {
+        child->setAttribute(Qt::WA_Hover, true);
+        child->installEventFilter(this);
+        m_navTargets.insert(child, target);
+    }
+}
+
+bool Sidebar::eventFilter(QObject *watched, QEvent *event) {
+    if (event->type() == QEvent::Enter) {
+        const QPointer<QWidget> target = m_navTargets.value(watched);
+        if (target) movePillTo(target);
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
+void Sidebar::leaveEvent(QEvent *event) {
+    if (m_selectedTarget) {
+        movePillTo(m_selectedTarget);
+    } else {
+        m_pillVisible = false;
+        update();
+    }
+    QWidget::leaveEvent(event);
+}
+
+void Sidebar::movePillTo(QWidget *target, bool immediate) {
+    if (!target || !target->isVisible()) return;
+
+    const QRect destination(target->mapTo(this, QPoint(0, 0)), target->size());
+    const int systemDuration = style()->styleHint(QStyle::SH_Widget_Animation_Duration);
+
+    m_pillAnimation->stop();
+    if (immediate || systemDuration == 0 || !m_pillVisible || !m_pillGeometry.isValid()) {
+        m_pillVisible = true;
+        setPillGeometry(destination);
+        return;
+    }
+
+    m_pillVisible = true;
+    m_pillAnimation->setStartValue(m_pillGeometry);
+    m_pillAnimation->setEndValue(destination);
+    m_pillAnimation->start();
+}
+
+void Sidebar::setPillGeometry(const QRect &geometry) {
+    m_pillGeometry = geometry;
+    update();
+}
+
+void Sidebar::paintEvent(QPaintEvent *event) {
+    QWidget::paintEvent(event);
+    if (!m_pillVisible || !m_pillGeometry.isValid()) return;
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(36, 36, 41));
+    painter.drawRoundedRect(m_pillGeometry, 7, 7);
 }
 
 void Sidebar::showSessionMenu(const QString &sessionId, const QPoint &pos) {

@@ -3,6 +3,7 @@
 #include <QAbstractButton>
 #include <QEvent>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QMouseEvent>
 
 #include "core/Theme.h"
@@ -144,6 +145,16 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr
     Q_UNUSED(result)
 #endif
     return QWidget::nativeEvent(eventType, message, result);
+}
+
+void MainWindow::keyPressEvent(QKeyEvent *e) {
+    if (e->key() == Qt::Key_F11) {
+        isFullScreen() ? showNormal() : showFullScreen();
+        updateCorners();
+        e->accept();
+        return;
+    }
+    QWidget::keyPressEvent(e);
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *e) {
