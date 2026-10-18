@@ -1,0 +1,5 @@
+# MSYS2 UCRT64 packages needed to build M-Cowork (one per line)
+mingw-w64-ucrt-x86_64-gcc
+mingw-w64-ucrt-x86_64-pkgconf
+mingw-w64-ucrt-x86_64-qt6-base
+mingw-w64-ucrt-x86_64-qt6-svg

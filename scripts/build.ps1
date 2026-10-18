@@ -1,0 +1,38 @@
+# Builds M-Cowork into build\m_cowork_ui.exe (incremental). Use -Clean for a full rebuild.
+param([switch]$Clean)
+$ErrorActionPreference = 'Stop'
+
+$root  = Split-Path -Parent $PSScriptRoot
+$src   = Join-Path $root 'src'
+$build = Join-Path $root 'build'
+$obj   = Join-Path $build 'obj'
+$exe   = Join-Path $build 'm_cowork_ui.exe'
+
+$env:Path = "C:\msys64\ucrt64\bin;$env:Path"
+if ($Clean -and (Test-Path $build)) { Remove-Item $build -Recurse -Force }
+New-Item -ItemType Directory -Force $obj | Out-Null
+
+$cflags = @((& pkg-config --cflags Qt6Widgets Qt6Svg) -split '\s+' | Where-Object { $_ })
+if ($LASTEXITCODE -ne 0) { throw 'Qt 6 Widgets/Svg not found. Run scripts\install-packages.ps1 first.' }
+$libs = @((& pkg-config --libs Qt6Widgets Qt6Svg) -split '\s+' | Where-Object { $_ })
+
+$newestHeader = (Get-ChildItem $src -Recurse -Filter *.h | Measure-Object LastWriteTime -Maximum).Maximum
+$objects = @()
+foreach ($cpp in Get-ChildItem $src -Recurse -Filter *.cpp) {
+    $rel = $cpp.FullName.Substring($src.Length + 1)
+    $o = Join-Path $obj (($rel -replace '[\\/]', '_') + '.o')
+    $objects += $o
+    $stale = (-not (Test-Path $o)) -or
+             ((Get-Item $o).LastWriteTime -lt $cpp.LastWriteTime) -or
+             ((Get-Item $o).LastWriteTime -lt $newestHeader)
+    if ($stale) {
+        Write-Host "compile  $rel"
+        & g++ -std=c++17 -O1 -Wall -I $src @cflags -c $cpp.FullName -o $o
+        if ($LASTEXITCODE -ne 0) { throw "Compilation failed: $rel" }
+    }
+}
+
+Write-Host 'link     m_cowork_ui.exe'
+& g++ @objects -o $exe @libs -mwindows
+if ($LASTEXITCODE -ne 0) { throw 'Linking failed.' }
+Write-Host "built    $exe"
