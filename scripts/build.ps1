@@ -16,6 +16,27 @@ $cflags = @((& pkg-config --cflags Qt6Widgets Qt6Svg Qt6Network) -split '\s+' | 
 if ($LASTEXITCODE -ne 0) { throw 'Qt 6 Widgets/Svg/Network not found. Run scripts\install-packages.ps1 first.' }
 $libs = @((& pkg-config --libs Qt6Widgets Qt6Svg Qt6Network) -split '\s+' | Where-Object { $_ })
 
+# Run moc on headers with Q_OBJECT
+$moc = "C:\msys64\ucrt64\bin\moc.exe"
+if (Test-Path $moc) {
+    foreach ($h in Get-ChildItem $src -Recurse -Filter *.h) {
+        $content = Get-Content $h.FullName -Raw
+        if ($content -match 'Q_OBJECT') {
+            $mocCpp = Join-Path $obj ('moc_' + $h.BaseName + '.cpp')
+            $stale = (-not (Test-Path $mocCpp)) -or ((Get-Item $mocCpp).LastWriteTime -lt $h.LastWriteTime)
+            if ($stale) {
+                Write-Host "moc      $($h.Name)"
+                & $moc $h.FullName -o $mocCpp -I $src
+            }
+            $o = Join-Path $obj ('moc_' + $h.BaseName + '.o')
+            $objects += $o
+            if ((-not (Test-Path $o)) -or ((Get-Item $o).LastWriteTime -lt (Get-Item $mocCpp).LastWriteTime)) {
+                & g++ -std=c++17 -O1 -Wall -I $src @cflags -c $mocCpp -o $o
+            }
+        }
+    }
+}
+
 $newestHeader = (Get-ChildItem $src -Recurse -Filter *.h | Measure-Object LastWriteTime -Maximum).Maximum
 $objects = @()
 foreach ($cpp in Get-ChildItem $src -Recurse -Filter *.cpp) {

@@ -18,9 +18,11 @@ class QFrame;
 namespace mcw {
 
 class WindowControls;
+class ModelSelector;
+class MicButton;
+class DotMatrixWordmark;
 
-// Right panel: modern smooth dark theme with subtle glows, message bubbles, input bar
-// and the window controls in the top-right corner.
+// Right panel: modern smooth UI with dot-matrix wordmark, in-chat model switching, and session sync.
 class ChatArea : public QWidget {
     Q_OBJECT
 public:
@@ -29,6 +31,9 @@ public:
     WindowControls *windowControls() const { return m_controls; }
     void focusInput();
     void setCornerRadius(int radius);
+
+public slots:
+    void loadCurrentSession();
 
 protected:
     void paintEvent(QPaintEvent *) override;
@@ -41,11 +46,15 @@ private:
     void executeNextToolCall(const QList<ToolCallRequest> &calls, int index);
 
     WindowControls *m_controls = nullptr;
+    ModelSelector *m_modelSelector = nullptr;
     QScrollArea *m_scroll = nullptr;
     QVBoxLayout *m_msgLayout = nullptr;
     QLineEdit *m_input = nullptr;
     QFrame *m_inputBar = nullptr;
     QLabel *m_statusPill = nullptr;
+    MicButton *m_micBtn = nullptr;
+    DotMatrixWordmark *m_wordmark = nullptr;
+
     bool m_hasMessages = false;
     CoworkTool m_tool;
     AiClient m_ai;
@@ -53,7 +62,6 @@ private:
     bool m_busy = false;
     int m_radius = theme::kWindowRadius;
 
-    // Subtle pulsing animation for background glow & active agent
     float m_pulsePhase = 0.0f;
     QTimer m_animTimer;
 };

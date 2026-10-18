@@ -8,14 +8,16 @@ namespace mcw {
 
 WindowControls::WindowControls(QWidget *parent) : QWidget(parent) {
     auto *l = new QHBoxLayout(this);
-    l->setContentsMargins(6, 6, 6, 6);
-    l->setSpacing(13);
+    l->setContentsMargins(4, 4, 4, 4);
+    l->setSpacing(8);  // Tighter, sleeker spacing
+
+    closeBtn = new CircleButton(CircleButton::Close, theme::kClose);
     minBtn = new CircleButton(CircleButton::Min, theme::kMinimize);
     maxBtn = new CircleButton(CircleButton::Max, theme::kMaximize);
-    closeBtn = new CircleButton(CircleButton::Close, theme::kClose);
+
+    l->addWidget(closeBtn);
     l->addWidget(minBtn);
     l->addWidget(maxBtn);
-    l->addWidget(closeBtn);
 }
 
 void WindowControls::enterEvent(QEnterEvent *) { setHover(true); }

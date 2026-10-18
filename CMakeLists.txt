@@ -18,7 +18,15 @@ set(SRC_AI
 set(SRC_CORE
     src/core/Assets.cpp
     src/core/Assets.h
+    src/core/Icons.cpp
+    src/core/Icons.h
+    src/core/ProviderKeyManager.cpp
+    src/core/ProviderKeyManager.h
+    src/core/SessionManager.cpp
+    src/core/SessionManager.h
     src/core/Theme.h
+    src/core/ThemeManager.cpp
+    src/core/ThemeManager.h
     src/core/SettingsManager.cpp
     src/core/SettingsManager.h
 )
@@ -26,8 +34,14 @@ set(SRC_CORE
 set(SRC_WIDGETS
     src/widgets/CircleButton.cpp
     src/widgets/CircleButton.h
+    src/widgets/DotMatrixWordmark.cpp
+    src/widgets/DotMatrixWordmark.h
     src/widgets/IconButton.cpp
     src/widgets/IconButton.h
+    src/widgets/MicButton.cpp
+    src/widgets/MicButton.h
+    src/widgets/ModelSelector.cpp
+    src/widgets/ModelSelector.h
     src/widgets/OutlinedLabel.cpp
     src/widgets/OutlinedLabel.h
     src/widgets/WindowControls.cpp
