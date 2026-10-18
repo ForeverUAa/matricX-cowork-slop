@@ -1,86 +1,20 @@
-# MatricX-Cowork v0.3.0 ⚡
+# matricX-cowork
 
-High-performance, visual ambient coworking simulation and mouse automation utility for Windows built in C++17 with Direct Win32 & GDI+.
+Computer-control **tool** for the M-Cowork AI client (Windows). It is not autonomous: it only does what the client asks, one command at a time. While running it shows a glow border, an `ESC to stop | AI: <status>` pill and the agent cursor. Press the physical **Esc** key to abort at any time.
 
-Designed for coworking simulation, active session keep-alive, or ambient screen automation with organic motion and visual feedback.
+## Protocol (JSON lines)
+stdin: `{"id":1,"cmd":"mouse_move","x":500,"y":300}` -> stdout: `{"id":1,"ok":true,"x":500,"y":300}`
+Errors: `{"id":N,"ok":false,"error":"..."}`. Events: `{"event":"ready",...}` on start, `{"event":"stopped","reason":"escape|idle_timeout|input_closed|end_session|console_signal"}` on exit.
 
----
+Commands: `screen_info`, `screenshot {path?}`, `mouse_move {x,y}`, `mouse_click {x?,y?,button?,count?}`, `mouse_drag {x,y,from_x?,from_y?}`, `mouse_scroll {dx?,dy?,x?,y?}`, `keyboard_type {text,delay_ms?}`, `keyboard_key {keys}`, `wait {ms}`, `end_session`.
+`matricX-cowork.exe --describe` prints all of them as AI tool schemas (`name`, `description`, `input_schema`).
 
-## ✨ Features (v0.3.0)
+## Options
+`--speed slow|normal|fast` `--glow green|cyan|rainbow|off` `--idle-timeout <sec>` (default 120, 0 = never) `--no-cursor` `--no-lock` `--describe` `--restore-cursor` `--help` `--version`
 
-- **🖱️ Organic Bézier Motion**: Smooth cubic Bézier trajectories with variable perpendicular offsets and smoothstep easing instead of linear steps.
-- **🤏 Human-like Micro-Jitter**: Simulates micro-vibrations during dwell pauses (mimicking a hand resting on a physical mouse).
-- **🌟 Animated Pulsing Edge Glow**: Dynamic ~20 FPS sinusoidal breathing border overlay that keeps the center clear.
-- **🎨 Multiple Color Themes**: Choose between `green`, `cyan`, `rainbow`, or disable with `off`.
-- **⏱️ Live Dynamic HUD**: Sleek anti-aliased pill overlay showing real-time countdown (`ESC to quit │ 45s`) or infinite indicator.
-- **🛡️ Bulletproof Cursor Safety**: Automatic system cursor restoration on normal exit, Escape, Ctrl+C / close event, and `std::atexit`.
-- **⚙️ Full CLI Suite**: Configurable duration, speed profiles, behavioral patterns, and glow themes.
+## Build
+`g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -static matricX-cowork.cpp -o matricX-cowork.exe -luser32 -lgdi32 -lgdiplus -lwinmm`
+or `.\matricX-cowork.ps1 -Build`. Test: `.\smoke-test.ps1`.
 
----
-
-## 🚀 Usage
-
-You can run either the compiled binary directly or use the PowerShell launcher:
-
-### 1. PowerShell Launcher
-```powershell
-.\matricX-cowork.ps1 [options]
-```
-
-### 2. Direct Executable
-```powershell
-.\matricX-cowork.exe [options]
-```
-
-### CLI Parameters Reference
-
-| Flag | Parameter | Description | Default |
-| :--- | :--- | :--- | :--- |
-| `--duration` | `<seconds>` \| `infinite` | Set runtime in seconds or run indefinitely (`0` or `infinite`) | `60` |
-| `--speed` | `slow` \| `normal` \| `fast` | Controls step distribution and velocity | `normal` |
-| `--pattern` | `wander` \| `work` \| `edge` | Movement bias (`work` stays central, `edge` hugs screen borders) | `wander` |
-| `--glow` | `green` \| `cyan` \| `rainbow` \| `off` | Color theme for animated border glow & HUD | `green` |
-| `--no-cursor`| _None_ | Keep normal system cursor instead of `akar-icons_cursor.png` | _Off_ |
-| `--no-lock` | _None_ | Do not block manual mouse movement | _Off_ |
-| `--restore-cursor` | _None_ | Immediately force-restore default Windows cursors & exit | _N/A_ |
-| `--help` | _None_ | Show usage reference | _N/A_ |
-| `--version` | _None_ | Print version string | _N/A_ |
-
-### Quick Examples
-
-```powershell
-# Run indefinitely with rainbow glow and fast movement
-.\matricX-cowork.ps1 -Duration infinite -Glow rainbow -Speed fast
-
-# Work simulation pattern (centered), cyan glow for 5 minutes
-.\matricX-cowork.ps1 -Duration 300 -Pattern work -Glow cyan
-
-# Free movement (unlocked), no custom cursor
-.\matricX-cowork.ps1 -NoLock -NoCursor
-```
-
----
-
-## 🛠️ Build from Source
-
-### MinGW-w64 (GCC)
-```powershell
-g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -static matricX-cowork.cpp -o matricX-cowork.exe -luser32 -lgdi32 -lgdiplus
-```
-
-### MSVC (Visual Studio Developer Command Prompt)
-```cmd
-cl /std:c++17 /EHsc /O2 /W4 matricX-cowork.cpp user32.lib gdi32.lib gdiplus.lib /Fe:matricX-cowork.exe
-```
-
----
-
-## 🔒 Safety & Recovery
-
-- Press **Escape** at any time to immediately restore manual mouse control and close the overlay.
-- If an unexpected termination occurs, restore normal Windows cursors instantly:
-  ```powershell
-  .\matricX-cowork.ps1 -RestoreCursor
-  # or
-  .\matricX-cowork.exe --restore-cursor
-  ```
+## Safety
+Esc aborts (injected Escape from the tool itself does not). If the cursor looks stuck: `matricX-cowork.exe --restore-cursor`.
