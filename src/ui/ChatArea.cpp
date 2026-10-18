@@ -164,8 +164,84 @@ void ChatArea::send() {
     update();
 
     addMessage(t, true);
-    m_history.append({"user", t});
 
+    if (t == "/help") {
+        const QString help = "Available commands:\n"
+                             "• /tools — List available computer control tools\n"
+                             "• /tool <name> [json] — Execute a tool (e.g. /tool screen_info or /tool mouse_move {\"x\":500,\"y\":300})\n"
+                             "• /tool end_session — End active tool session\n"
+                             "• /help — Show this help message";
+        addMessage(help, false);
+        return;
+    }
+
+    if (t == "/tools") {
+        if (!m_tool.available()) {
+            addMessage("Error: matricX-cowork tool binary not found. Build it first with scripts/build.ps1 or build.sh.", false);
+            return;
+        }
+        const QJsonArray defs = m_tool.definitions();
+        if (defs.isEmpty()) {
+            addMessage("No tool definitions returned from matricX-cowork --describe.", false);
+            return;
+        }
+        QString out = QString("Available Tools (%1):\n").arg(defs.size());
+        for (const auto &val : defs) {
+            const QJsonObject obj = val.toObject();
+            out += QString("• %1: %2\n").arg(obj["name"].toString(), obj["description"].toString());
+        }
+        addMessage(out.trimmed(), false);
+        return;
+    }
+
+    if (t.startsWith("/tool ") || t == "/tool") {
+        if (!m_tool.available()) {
+            addMessage("Error: matricX-cowork tool binary not found. Build it first.", false);
+            return;
+        }
+        const QString rest = t.mid(5).trimmed();
+        if (rest.isEmpty()) {
+            addMessage("Usage: /tool <name> [{\"key\": value, ...}]\nExample: /tool mouse_move {\"x\":500,\"y\":300}", false);
+            return;
+        }
+        const int spaceIdx = rest.indexOf(' ');
+        const QString toolName = (spaceIdx == -1) ? rest : rest.left(spaceIdx).trimmed();
+        const QString jsonStr = (spaceIdx == -1) ? QString() : rest.mid(spaceIdx + 1).trimmed();
+
+        QJsonObject args;
+        if (!jsonStr.isEmpty()) {
+            QJsonParseError parseErr;
+            const QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8(), &parseErr);
+            if (parseErr.error != QJsonParseError::NoError || !doc.isObject()) {
+                addMessage(QString("JSON parse error: %1").arg(parseErr.errorString()), false);
+                return;
+            }
+            args = doc.object();
+        }
+
+        m_tool.call(toolName, args, [this, toolName](const QJsonObject &reply) {
+            const bool ok = reply["ok"].toBool();
+            QString text;
+            if (ok) {
+                QJsonObject copy = reply;
+                copy.remove("id");
+                copy.remove("ok");
+                if (copy.isEmpty()) {
+                    text = QString("✓ %1 completed successfully").arg(toolName);
+                } else {
+                    text = QString("✓ %1 result:\n%2")
+                               .arg(toolName, QString::fromUtf8(QJsonDocument(copy).toJson(QJsonDocument::Indented)).trimmed());
+                }
+            } else {
+                text = QString("✗ %1 failed: %2")
+                           .arg(toolName, reply["error"].toString("unknown error"));
+            }
+            addMessage(text, false);
+        });
+        return;
+    }
+
+    m_history.append({"user", t});
     runAgentLoop();
 }
 

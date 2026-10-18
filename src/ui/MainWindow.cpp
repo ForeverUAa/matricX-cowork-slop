@@ -3,6 +3,7 @@
 #include <QAbstractButton>
 #include <QEvent>
 #include <QHBoxLayout>
+#include <QMouseEvent>
 
 #include "core/Theme.h"
 #include "ui/ChatArea.h"
@@ -143,6 +144,43 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr
     Q_UNUSED(result)
 #endif
     return QWidget::nativeEvent(eventType, message, result);
+}
+
+void MainWindow::mousePressEvent(QMouseEvent *e) {
+#ifndef Q_OS_WIN
+    if (e->button() == Qt::LeftButton && e->position().y() < theme::kCaptionHeight) {
+        QWidget *w = childAt(e->position().toPoint());
+        if (!w || (!dynamic_cast<QAbstractButton *>(w) && !dynamic_cast<WindowControls *>(w))) {
+            m_dragging = true;
+            m_dragPosition = e->globalPosition().toPoint() - frameGeometry().topLeft();
+            e->accept();
+            return;
+        }
+    }
+#endif
+    QWidget::mousePressEvent(e);
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent *e) {
+#ifndef Q_OS_WIN
+    if (m_dragging && (e->buttons() & Qt::LeftButton)) {
+        move(e->globalPosition().toPoint() - m_dragPosition);
+        e->accept();
+        return;
+    }
+#endif
+    QWidget::mouseMoveEvent(e);
+}
+
+void MainWindow::mouseReleaseEvent(QMouseEvent *e) {
+#ifndef Q_OS_WIN
+    if (m_dragging && e->button() == Qt::LeftButton) {
+        m_dragging = false;
+        e->accept();
+        return;
+    }
+#endif
+    QWidget::mouseReleaseEvent(e);
 }
 
 }  // namespace mcw

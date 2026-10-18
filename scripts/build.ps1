@@ -36,3 +36,15 @@ Write-Host 'link     m_cowork_ui.exe'
 & g++ @objects -o $exe @libs -mwindows
 if ($LASTEXITCODE -ne 0) { throw 'Linking failed.' }
 Write-Host "built    $exe"
+
+$toolSrc = Join-Path $root 'tools\matricX-cowork\matricX-cowork.cpp'
+$toolExe = Join-Path $root 'tools\matricX-cowork\matricX-cowork.exe'
+if (Test-Path $toolSrc) {
+    $toolStale = (-not (Test-Path $toolExe)) -or ((Get-Item $toolSrc).LastWriteTime -gt (Get-Item $toolExe).LastWriteTime)
+    if ($toolStale) {
+        Write-Host 'compile  tools\matricX-cowork\matricX-cowork.cpp'
+        & g++ -std=c++17 -O2 -Wall -Wextra -static $toolSrc -o $toolExe -luser32 -lgdi32 -lgdiplus -lwinmm
+        if ($LASTEXITCODE -ne 0) { throw 'matricX-cowork tool compilation failed.' }
+        Write-Host "built    $toolExe"
+    }
+}

@@ -7,6 +7,18 @@
 
 namespace mcw {
 
+static QString toolExecutablePath() {
+#ifdef Q_OS_WIN
+    return assets::toolPath("matricX-cowork/matricX-cowork.exe");
+#else
+    const QString p = assets::toolPath("matricX-cowork/matricX-cowork");
+    if (QFileInfo::exists(p)) return p;
+    const QString fallback = assets::toolPath("matricX-cowork");
+    if (QFileInfo::exists(fallback)) return fallback;
+    return p;
+#endif
+}
+
 CoworkTool::CoworkTool() = default;
 
 CoworkTool::~CoworkTool() {
@@ -23,13 +35,13 @@ CoworkTool::~CoworkTool() {
 }
 
 bool CoworkTool::available() const {
-    return QFileInfo::exists(assets::toolPath("matricX-cowork/matricX-cowork.exe"));
+    return QFileInfo::exists(toolExecutablePath());
 }
 
 QJsonArray CoworkTool::definitions() {
     if (!m_defs.isEmpty() || !available()) return m_defs;
     QProcess p;
-    p.start(assets::toolPath("matricX-cowork/matricX-cowork.exe"), {"--describe"});
+    p.start(toolExecutablePath(), {"--describe"});
     if (p.waitForFinished(5000)) m_defs = QJsonDocument::fromJson(p.readAllStandardOutput()).array();
     return m_defs;
 }
@@ -51,14 +63,14 @@ bool CoworkTool::ensureStarted() {
         onOutput();
         failPending("tool session ended");
     });
-    m_proc->start(assets::toolPath("matricX-cowork/matricX-cowork.exe"),
+    m_proc->start(toolExecutablePath(),
                   {"--glow", "green", "--speed", "normal", "--idle-timeout", "120"});
     return m_proc->waitForStarted(3000);
 }
 
 void CoworkTool::call(const QString &tool, const QJsonObject &args, Callback cb) {
     if (!ensureStarted()) {
-        cb({{"ok", false}, {"error", "matricX-cowork tool is not installed (run scripts/sync-cowork-tool.ps1)"}});
+        cb({{"ok", false}, {"error", "matricX-cowork tool is not installed or built yet"}});
         return;
     }
     QJsonObject req = args;

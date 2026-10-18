@@ -1,61 +1,54 @@
 # M-Cowork
 
-An AI app that lets people use their AI like OpenCode. Native Windows desktop UI built with Qt 6 Widgets (C++17).
-
-## Project layout
-
-```
-ai app/
-├── assets/
-│   ├── icons/            SVG icons (app, gear, mic, mic-hover)
-│   └── images/           Design prototype (prototype.png)
-├── packages/
-│   └── msys2-packages.txt   MSYS2 packages required to build
-├── scripts/
-│   ├── install-packages.ps1 Installs the packages above
-│   ├── build.ps1            Incremental build -> build\m_cowork_ui.exe
-│   └── run.ps1              Runs the app (builds first if needed)
-├── src/
-│   ├── main.cpp
-│   ├── core/             Theme.h (colors/sizes), Assets (asset path + SVG loader)
-│   ├── widgets/          OutlinedLabel, CircleButton, WindowControls, IconButton
-│   └── ui/               MainWindow, Sidebar, ChatArea
-└── build/                Build output (git-ignored)
-```
+An AI app that lets people use their AI like OpenCode. Cross-platform desktop UI built with Qt 6 Widgets (C++17) supporting Windows and Linux.
 
 ## Requirements
 
-- Windows
-- [MSYS2](https://www.msys2.org/) installed at `C:\msys64`
+### Windows
+- Windows 10/11
+- [MSYS2](https://www.msys2.org/) installed at `C:\msys64` (UCRT64 environment)
 
-## Setup
+### Linux
+- Modern Linux distribution (Arch/Ubuntu/Fedora/Debian)
+- GCC / Clang (C++17)
+- CMake (>= 3.16)
+- Qt 6 (Widgets, Svg)
+- X11 development headers & extensions (`libx11`, `libxtst`, `libxfixes`)
+- `libpng`
+- Optional: `grim` (for native Wayland screen captures)
 
-From PowerShell in the project folder, install the build packages (GCC, pkgconf, Qt 6 base + SVG):
+## Setup & Build
 
+### Windows (PowerShell)
 ```powershell
+# 1. Install MSYS2 build packages
 powershell -ExecutionPolicy Bypass -File .\scripts\install-packages.ps1
-```
 
-## Build
-
-```powershell
+# 2. Build the UI and computer-control tool
 powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1          # incremental
 powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Clean   # full rebuild
-```
 
-## Run
-
-```powershell
+# 3. Run the application
 powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1
 ```
 
-## Notes
+### Linux (Bash / CMake)
+```bash
+# 1. Build using the build script or CMake
+./scripts/build.sh
 
-- The window is frameless and rounded, but still behaves like a normal Windows window
-  (drag from the top strip, Aero Snap, resize from any edge, maximize, taskbar minimize).
-- Assets are located at runtime by walking up from the executable's folder to `assets/`.
-## AI tool (matricX-cowork)
-Run `scripts\sync-cowork-tool.ps1` to build and copy the computer-control tool into `tools/`. In the chat box: `/tools` lists tools, `/tool mouse_move {"x":500,"y":300}` runs one. The AI provider will call the same interface.
+# 2. Run the application
+./scripts/run.sh
+
+# 3. Run the smoke test
+./scripts/smoke-test.sh
+```
+
+## AI Tool (`matricX-cowork`)
+The computer-control engine communicates with the GUI via a JSON-lines protocol over standard I/O:
+- In the chat box, type `/tools` to display all available OS automation actions and schemas.
+- Run commands manually: `/tool mouse_move {"x":500,"y":300}`, `/tool screen_info`, or `/tool screenshot`.
+- The AI provider loop will leverage the same schema interface.
 
 ## Status
 

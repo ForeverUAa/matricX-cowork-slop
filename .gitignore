@@ -1,4 +1,6 @@
 build/
 *.bak
 *.exe
-*.otools/
+*.o
+tools/matricX-cowork/matricX-cowork
+tools/matricX-cowork/matricX-cowork.exe
