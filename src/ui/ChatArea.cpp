@@ -38,14 +38,24 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     topBar->setContentsMargins(16, 12, 16, 8);
     topBar->setSpacing(12);
 
-    m_uncollapseBtn = new QPushButton(this);
+    m_collapsedControls = new QWidget(this);
+    auto *cLayout = new QHBoxLayout(m_collapsedControls);
+    cLayout->setContentsMargins(0, 0, 0, 0);
+    cLayout->setSpacing(8);
+
+    m_controls = new WindowControls(m_collapsedControls);
+    cLayout->addWidget(m_controls, 0, Qt::AlignVCenter);
+
+    m_uncollapseBtn = new QPushButton(m_collapsedControls);
     m_uncollapseBtn->setIcon(icons::icon(icons::IconType::PanelLeft, QColor(161, 161, 170)));
-    m_uncollapseBtn->setFixedSize(30, 30);
+    m_uncollapseBtn->setFixedSize(28, 28);
     m_uncollapseBtn->setCursor(Qt::PointingHandCursor);
     m_uncollapseBtn->setToolTip("Open Sidebar");
     m_uncollapseBtn->setStyleSheet("QPushButton { background: transparent; border: none; border-radius: 6px; } QPushButton:hover { background: rgba(255,255,255,0.08); }");
-    m_uncollapseBtn->hide();
-    topBar->addWidget(m_uncollapseBtn);
+    cLayout->addWidget(m_uncollapseBtn, 0, Qt::AlignVCenter);
+
+    m_collapsedControls->hide();
+    topBar->addWidget(m_collapsedControls);
 
     m_threadTitleLabel = new QLabel(this);
     m_threadTitleLabel->setStyleSheet("color: #f4f4f5; font-size: 14px; font-weight: 600;");
@@ -57,9 +67,6 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     topBar->addWidget(m_statusPill);
 
     topBar->addStretch();
-
-    m_controls = new WindowControls(this);
-    topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
     root->addLayout(topBar);
 
     // Center Message Stream (Codex centered column with max width 780px)
@@ -298,7 +305,7 @@ void ChatArea::setCornerRadius(int radius) {
 }
 
 void ChatArea::setSidebarCollapsed(bool collapsed) {
-    m_uncollapseBtn->setVisible(collapsed);
+    m_collapsedControls->setVisible(collapsed);
 }
 
 void ChatArea::updateStatusIndicator(const QString &text, bool active) {

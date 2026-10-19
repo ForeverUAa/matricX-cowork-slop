@@ -128,8 +128,14 @@ void ActionStepCard::setStatus(Status s, const QString &resultText, const QStrin
             m_chevronBtn->setIcon(icons::icon(icons::IconType::ChevronDown, QColor(161, 161, 170)));
 
             m_imagePreview->disconnect();
-            m_imagePreview->installEventFilter(this);
-            connect(m_chevronBtn, &QObject::destroyed, []{});
+            auto *clickBtn = new QPushButton("View Full Image", m_detailsWidget);
+            clickBtn->setCursor(Qt::PointingHandCursor);
+            clickBtn->setFixedHeight(26);
+            clickBtn->setStyleSheet("background: #27272a; color: #38bdf8; border: 1px solid #3f3f46; border-radius: 4px; font-size: 11px; font-weight: 500; padding: 0 10px;");
+            connect(clickBtn, &QPushButton::clicked, this, [imagePath] {
+                QDesktopServices::openUrl(QUrl::fromLocalFile(imagePath));
+            });
+            m_detailsWidget->layout()->addWidget(clickBtn);
         }
     }
 }

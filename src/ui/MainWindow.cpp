@@ -55,12 +55,16 @@ MainWindow::MainWindow() {
         m_sidebar->setCollapsed(false);
     });
 
-    WindowControls *controls = m_chat->windowControls();
-    connect(controls->maxBtn, &QAbstractButton::clicked, this, [this] {
-        toggleMaximize();
-    });
-    connect(controls->minBtn, &QAbstractButton::clicked, this, [this] { showMinimized(); });
-    connect(controls->closeBtn, &QAbstractButton::clicked, this, [this] { close(); });
+    // Connect window buttons on sidebar (primary) and chat header (fallback when sidebar collapsed)
+    auto wireControls = [this](WindowControls *ctrl) {
+        if (!ctrl) return;
+        connect(ctrl->maxBtn, &QAbstractButton::clicked, this, [this] { toggleMaximize(); });
+        connect(ctrl->minBtn, &QAbstractButton::clicked, this, [this] { showMinimized(); });
+        connect(ctrl->closeBtn, &QAbstractButton::clicked, this, [this] { close(); });
+    };
+
+    wireControls(m_sidebar->windowControls());
+    wireControls(m_chat->windowControls());
 
     connect(m_sidebar->settingsButton(), &QAbstractButton::clicked, this, [this] {
         SettingsDialog dlg(this);

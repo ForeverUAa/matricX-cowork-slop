@@ -9,12 +9,15 @@
 
 namespace mcw {
 
+class WindowControls;
+
 // OpenAI Codex-style sidebar: collapsible, search filter, clean session list, user/settings footer.
 class Sidebar : public QWidget {
     Q_OBJECT
 public:
     explicit Sidebar(QWidget *parent = nullptr);
 
+    WindowControls *windowControls() const { return m_controls; }
     QPushButton *settingsButton() const { return m_settingsBtn; }
     QPushButton *toggleButton() const { return m_toggleBtn; }
     void setCornerRadius(int radius);
@@ -33,8 +36,9 @@ private:
     void updateTheme();
 
     bool m_collapsed = false;
-    int m_expandedWidth = 240;
+    int m_expandedWidth = 250;
 
+    WindowControls *m_controls = nullptr;
     QPushButton *m_toggleBtn = nullptr;
     QPushButton *m_newThreadBtn = nullptr;
     QLineEdit *m_searchEdit = nullptr;

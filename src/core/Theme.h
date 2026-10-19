@@ -2,43 +2,37 @@
 
 #include <QColor>
 
-// Central place for sizes and colours used across the UI.
+// Central place for sizes and colors used across the OpenAI Codex-inspired desktop UI.
 namespace mcw::theme {
 
 // geometry
-inline constexpr int kDefaultWidth = 1000;
-inline constexpr int kDefaultHeight = 711;
-inline constexpr int kMinWidth = 720;
-inline constexpr int kMinHeight = 480;
-inline constexpr int kSidebarWidth = 221;
-inline constexpr int kWindowRadius = 16;
-inline constexpr int kCaptionHeight = 56;  // draggable title strip at the top
-inline constexpr int kResizeBorder = 8;    // invisible resize zone around the window
+inline constexpr int kDefaultWidth = 1100;
+inline constexpr int kDefaultHeight = 780;
+inline constexpr int kMinWidth = 780;
+inline constexpr int kMinHeight = 520;
+inline constexpr int kSidebarWidth = 244;
+inline constexpr int kCollapsedSidebarWidth = 54;
+inline constexpr int kWindowRadius = 12;
+inline constexpr int kCaptionHeight = 46;
+inline constexpr int kResizeBorder = 8;
+inline constexpr int kChatMaxWidth = 760;
 
-// window controls
-inline const QColor kMinimize(255, 221, 0);
-inline const QColor kMaximize(43, 255, 0);
-inline const QColor kClose(255, 0, 0);
+// macOS window controls
+inline const QColor kClose(255, 95, 87);
+inline const QColor kMinimize(254, 188, 46);
+inline const QColor kMaximize(40, 200, 64);
 
-// sidebar
-inline const QColor kSidebarBg(64, 64, 64);
-inline const QColor kChatItemBg(93, 93, 93);
-inline const QColor kChatItemHoverBg(104, 104, 104);
-inline const QColor kChatItemText(232, 232, 232);
-inline const QColor kSettingsBg(88, 88, 88);
+// Authentic OpenAI Codex Dark Palette
+inline const QColor kDarkCanvas(24, 24, 27);       // #18181b
+inline const QColor kDarkSidebar(18, 18, 20);      // #121214
+inline const QColor kDarkSurface(33, 33, 36);      // #212124
+inline const QColor kDarkBorder(46, 46, 51);       // #2e2e33
+inline const QColor kDarkTextPrimary(244, 244, 245);
+inline const QColor kDarkTextSecondary(161, 161, 170);
+inline const QColor kDarkTextMuted(113, 113, 122);
 
-// chat area
-inline const QColor kTitleFill(34, 34, 34);
-inline const QColor kTitleOutline(10, 125, 0);
-inline const QColor kGradientBottom(16, 170, 0);
-inline const QColor kInputInner(61, 61, 61);
-inline const QColor kInputBorder(51, 51, 51);
-inline const QColor kInputText(238, 238, 238);
-inline const QColor kInputPlaceholder(150, 150, 160);
-inline const QColor kInputDivider(44, 44, 44);
-inline const QColor kUserBubbleBg(18, 54, 15);
-inline const QColor kUserBubbleBorder(29, 122, 18);
-inline const QColor kBotBubbleBg(43, 43, 43);
-inline const QColor kBotBubbleText(221, 221, 221);
+// Accent
+inline const QColor kAccent(16, 185, 129);         // #10b981
+inline const QColor kAccentHover(52, 211, 153);    // #34d399
 
 }  // namespace mcw::theme

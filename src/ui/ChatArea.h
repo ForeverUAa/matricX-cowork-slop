@@ -55,6 +55,7 @@ private:
     void executeNextToolCall(const QList<ToolCallRequest> &calls, int index);
 
     QPushButton *m_uncollapseBtn = nullptr;
+    QWidget *m_collapsedControls = nullptr;
     QLabel *m_threadTitleLabel = nullptr;
     WindowControls *m_controls = nullptr;
 

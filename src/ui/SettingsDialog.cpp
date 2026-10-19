@@ -57,16 +57,17 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     headerLayout->addWidget(closeBtn);
     mainLayout->addLayout(headerLayout);
 
-    // Styled tab widget
+    // Styled tab widget (Codex desktop segmented navigation)
     m_tabs = new QTabWidget(this);
     m_tabs->setStyleSheet(
-        "QTabWidget::pane { border: 1px solid #333338; border-radius: 8px; background: #1c1c20; }"
+        "QTabWidget::pane { border: 1px solid #2e2e33; border-radius: 8px; background: #18181b; }"
         "QTabBar::tab {"
-        "  background: #242429; color: #9ca3af; padding: 8px 18px; margin-right: 4px;"
-        "  border-top-left-radius: 6px; border-top-right-radius: 6px; font-weight: 600; font-size: 13px;"
+        "  background: #121214; color: #a1a1aa; padding: 8px 18px; margin-right: 4px;"
+        "  border: 1px solid transparent; border-top-left-radius: 6px; border-top-right-radius: 6px;"
+        "  font-weight: 500; font-size: 13px;"
         "}"
-        "QTabBar::tab:selected { background: #1c1c20; color: #10b981; border: 1px solid #333338; border-bottom: none; }"
-        "QTabBar::tab:hover:!selected { background: #2c2c33; color: #d1d5db; }");
+        "QTabBar::tab:selected { background: #18181b; color: #10b981; border: 1px solid #2e2e33; border-bottom: none; font-weight: 600; }"
+        "QTabBar::tab:hover:!selected { background: #1c1c20; color: #f4f4f5; }");
 
     auto *providersTab = new QWidget;
     setupProvidersTab(providersTab);
