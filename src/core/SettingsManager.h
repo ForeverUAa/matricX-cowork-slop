@@ -36,6 +36,9 @@ public:
 
     QString activeBaseUrl() const;
 
+    bool requireConfirmation() const;
+    void setRequireConfirmation(bool req);
+
 private:
     SettingsManager();
 };

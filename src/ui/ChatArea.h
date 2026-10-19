@@ -45,6 +45,7 @@ protected:
 private:
     void setupEmptyState(QWidget *container);
     void addMessage(const QString &text, bool fromUser);
+    void addErrorMessage(const QString &errorMessage);
     void addActionCard(const QString &toolName, const QJsonObject &args);
     void updateStatusIndicator(const QString &text, bool active);
     void updateSendButtonState();

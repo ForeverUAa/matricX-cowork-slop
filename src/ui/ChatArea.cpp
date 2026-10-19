@@ -401,7 +401,10 @@ void ChatArea::addMessage(const QString &text, bool fromUser) {
         cardLayout->addLayout(hdr);
 
         // Text body
-        auto *body = new QLabel(text, card);
+        auto *body = new QLabel(card);
+        body->setTextFormat(Qt::MarkdownText);
+        body->setOpenExternalLinks(true);
+        body->setText(text);
         body->setWordWrap(true);
         body->setTextInteractionFlags(Qt::TextSelectableByMouse);
         body->setStyleSheet(dark ? "color: #e4e4e7; font-size: 14px; line-height: 1.5;"
@@ -420,6 +423,56 @@ void ChatArea::addMessage(const QString &text, bool fromUser) {
 void ChatArea::addActionCard(const QString &toolName, const QJsonObject &args) {
     auto *card = new ActionStepCard(toolName, args, this);
     m_currentActionCard = card;
+    m_msgLayout->insertWidget(m_msgLayout->count() - 1, card);
+    QTimer::singleShot(10, this, [this] {
+        m_scroll->verticalScrollBar()->setValue(m_scroll->verticalScrollBar()->maximum());
+    });
+}
+
+void ChatArea::addErrorMessage(const QString &errorMessage) {
+    auto *card = new QFrame(this);
+    card->setObjectName("errorCard");
+    card->setStyleSheet(
+        "QFrame#errorCard {"
+        "  background: rgba(239, 68, 68, 0.1);"
+        "  border: 1px solid rgba(239, 68, 68, 0.3);"
+        "  border-radius: 8px;"
+        "}");
+    auto *l = new QHBoxLayout(card);
+    l->setContentsMargins(12, 10, 12, 10);
+    l->setSpacing(10);
+
+    auto *errIcon = new QLabel(card);
+    errIcon->setPixmap(icons::pixmap(icons::IconType::X, QSize(16, 16), QColor(248, 113, 113)));
+    l->addWidget(errIcon);
+
+    auto *errLbl = new QLabel(errorMessage, card);
+    errLbl->setWordWrap(true);
+    errLbl->setStyleSheet("color: #fca5a5; font-size: 13px; font-weight: 500;");
+    l->addWidget(errLbl, 1);
+
+    auto *retryBtn = new QPushButton("Retry", card);
+    retryBtn->setIcon(icons::icon(icons::IconType::RotateCcw, QColor(248, 113, 113)));
+    retryBtn->setCursor(Qt::PointingHandCursor);
+    retryBtn->setFixedHeight(28);
+    retryBtn->setStyleSheet(
+        "QPushButton {"
+        "  background: rgba(239, 68, 68, 0.2);"
+        "  color: #fecaca;"
+        "  border: 1px solid rgba(239, 68, 68, 0.4);"
+        "  border-radius: 4px;"
+        "  padding: 0 10px;"
+        "  font-size: 12px;"
+        "  font-weight: 600;"
+        "}"
+        "QPushButton:hover { background: rgba(239, 68, 68, 0.35); }");
+    connect(retryBtn, &QPushButton::clicked, this, [this, card] {
+        card->hide();
+        card->deleteLater();
+        runAgentLoop();
+    });
+    l->addWidget(retryBtn);
+
     m_msgLayout->insertWidget(m_msgLayout->count() - 1, card);
     QTimer::singleShot(10, this, [this] {
         m_scroll->verticalScrollBar()->setValue(m_scroll->verticalScrollBar()->maximum());
@@ -541,7 +594,7 @@ void ChatArea::runAgentLoop() {
             m_input->setFocus();
             updateSendButtonState();
             updateStatusIndicator(QString(), false);
-            SessionManager::instance().appendMessage(currentSid, "assistant", QString("Error: %1").arg(resp.errorMessage));
+            addErrorMessage(resp.errorMessage);
             return;
         }
 
@@ -574,20 +627,69 @@ void ChatArea::executeNextToolCall(const QList<ToolCallRequest> &calls, int inde
 
     addActionCard(tc.name, tc.arguments);
 
-    m_tool.call(tc.name, tc.arguments, [this, calls, index, tc](const QJsonObject &reply) {
-        const bool ok = reply["ok"].toBool();
-        QString imgPath;
-        if (reply.contains("path")) imgPath = reply.value("path").toString();
-        const QString toolResultStr = QString::fromUtf8(QJsonDocument(reply).toJson(QJsonDocument::Compact));
+    auto proceed = [this, calls, index, tc]() {
+        m_tool.call(tc.name, tc.arguments, [this, calls, index, tc](const QJsonObject &reply) {
+            const bool ok = reply["ok"].toBool();
+            QString imgPath;
+            if (reply.contains("path")) imgPath = reply.value("path").toString();
+            const QString toolResultStr = QString::fromUtf8(QJsonDocument(reply).toJson(QJsonDocument::Compact));
 
-        if (m_currentActionCard) {
-            m_currentActionCard->setStatus(ok ? ActionStepCard::Status::Success : ActionStepCard::Status::Failed,
-                                           toolResultStr, imgPath);
-        }
+            if (m_currentActionCard) {
+                m_currentActionCard->setStatus(ok ? ActionStepCard::Status::Success : ActionStepCard::Status::Failed,
+                                               toolResultStr, imgPath);
+            }
 
-        m_history.append({"user", QString("Tool result for %1: %2").arg(tc.name, toolResultStr)});
-        executeNextToolCall(calls, index + 1);
-    });
+            m_history.append({"user", QString("Tool result for %1: %2").arg(tc.name, toolResultStr)});
+            executeNextToolCall(calls, index + 1);
+        });
+    };
+
+    if (SettingsManager::instance().requireConfirmation()) {
+        auto *confirmFrame = new QFrame(this);
+        confirmFrame->setObjectName("confirmFrame");
+        confirmFrame->setStyleSheet(
+            "QFrame#confirmFrame {"
+            "  background: #27272a;"
+            "  border: 1px solid #eab308;"
+            "  border-radius: 8px;"
+            "}");
+        auto *cLayout = new QHBoxLayout(confirmFrame);
+        cLayout->setContentsMargins(12, 8, 12, 8);
+        cLayout->setSpacing(10);
+
+        auto *promptLbl = new QLabel(QString("Permission: Allow M-Cowork to run '%1'?").arg(tc.name), confirmFrame);
+        promptLbl->setStyleSheet("color: #fef08a; font-size: 13px; font-weight: 500;");
+        cLayout->addWidget(promptLbl, 1);
+
+        auto *allowBtn = new QPushButton("Allow", confirmFrame);
+        allowBtn->setCursor(Qt::PointingHandCursor);
+        allowBtn->setStyleSheet("background: #10b981; color: white; border: none; border-radius: 4px; padding: 4px 12px; font-weight: 600; font-size: 12px;");
+        cLayout->addWidget(allowBtn);
+
+        auto *denyBtn = new QPushButton("Deny", confirmFrame);
+        denyBtn->setCursor(Qt::PointingHandCursor);
+        denyBtn->setStyleSheet("background: #3f3f46; color: #d4d4d8; border: none; border-radius: 4px; padding: 4px 12px; font-size: 12px;");
+        cLayout->addWidget(denyBtn);
+
+        m_msgLayout->insertWidget(m_msgLayout->count() - 1, confirmFrame);
+
+        connect(allowBtn, &QPushButton::clicked, this, [confirmFrame, proceed] {
+            confirmFrame->hide();
+            confirmFrame->deleteLater();
+            proceed();
+        });
+        connect(denyBtn, &QPushButton::clicked, this, [this, confirmFrame, tc, calls, index] {
+            confirmFrame->hide();
+            confirmFrame->deleteLater();
+            if (m_currentActionCard) {
+                m_currentActionCard->setStatus(ActionStepCard::Status::Failed, "User denied execution permission.");
+            }
+            m_history.append({"user", QString("Tool execution for %1 denied by user.").arg(tc.name)});
+            executeNextToolCall(calls, index + 1);
+        });
+    } else {
+        proceed();
+    }
 }
 
 }  // namespace mcw

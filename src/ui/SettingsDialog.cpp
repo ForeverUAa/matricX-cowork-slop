@@ -1,5 +1,6 @@
 #include "ui/SettingsDialog.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -146,6 +147,28 @@ void SettingsDialog::setupAppearanceTab(QWidget *tab) {
     auto *themeHint = new QLabel("Appearance changes take effect instantly across all windows.");
     themeHint->setStyleSheet("color: #9ca3af; font-size: 12px;");
     layout->addWidget(themeHint);
+
+    layout->addSpacing(12);
+
+    auto *safetyLabel = new QLabel("Computer Control & Safety");
+    safetyLabel->setStyleSheet("color: #e5e7eb; font-size: 14px; font-weight: 600;");
+    layout->addWidget(safetyLabel);
+
+    auto *confirmCheck = new QCheckBox("Prompt for user permission before executing OS control actions");
+    confirmCheck->setChecked(SettingsManager::instance().requireConfirmation());
+    confirmCheck->setCursor(Qt::PointingHandCursor);
+    confirmCheck->setStyleSheet(
+        "QCheckBox { color: #d1d5db; font-size: 13px; }"
+        "QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid #52525b; border-radius: 4px; background: #27272a; }"
+        "QCheckBox::indicator:checked { background: #10b981; border-color: #10b981; }");
+    connect(confirmCheck, &QCheckBox::toggled, this, [](bool checked) {
+        SettingsManager::instance().setRequireConfirmation(checked);
+    });
+    layout->addWidget(confirmCheck);
+
+    auto *safetyHint = new QLabel("When enabled, M-Cowork shows an Allow/Deny banner before each mouse or keyboard action.");
+    safetyHint->setStyleSheet("color: #9ca3af; font-size: 12px;");
+    layout->addWidget(safetyHint);
 
     layout->addStretch();
 }

@@ -139,5 +139,15 @@ QString SettingsManager::activeBaseUrl() const {
     return customBaseUrl(provider());
 }
 
+bool SettingsManager::requireConfirmation() const {
+    QSettings s("MCowork", "MCowork");
+    return s.value("safety/requireConfirmation", false).toBool();
+}
+
+void SettingsManager::setRequireConfirmation(bool req) {
+    QSettings s("MCowork", "MCowork");
+    s.setValue("safety/requireConfirmation", req);
+}
+
 }  // namespace mcw
 
