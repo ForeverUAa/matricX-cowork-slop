@@ -7,6 +7,7 @@
 #include <QWidget>
 
 #include "ai/AiClient.h"
+#include "core/AudioRecorder.h"
 #include "core/Theme.h"
 #include "tools/CoworkTool.h"
 
@@ -74,6 +75,7 @@ private:
     bool m_hasMessages = false;
     CoworkTool m_tool;
     AiClient m_ai;
+    AudioRecorder m_audioRecorder;
     QList<ChatMessage> m_history;
     bool m_busy = false;
     int m_radius = theme::kWindowRadius;

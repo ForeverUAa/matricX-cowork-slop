@@ -2,6 +2,8 @@
 #include "ai/AntigravityAuth.h"
 
 #include <QFile>
+#include <QHttpMultiPart>
+#include <QHttpPart>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -533,6 +535,69 @@ void AiClient::fetchAvailableModels(const QString &providerId, ModelsCallback ca
             if (!id.isEmpty()) models.append(id);
         }
         callback(true, models, QString());
+    });
+}
+
+void AiClient::transcribeAudio(const QString &audioFilePath, TranscriptionCallback callback) {
+    auto &sm = SettingsManager::instance();
+    // Prefer Groq (whisper-large-v3-turbo), then OpenAI (whisper-1)
+    QString apiKey = sm.apiKey("groq");
+    QString endpoint = "https://api.groq.com/openai/v1/audio/transcriptions";
+    QString modelName = "whisper-large-v3-turbo";
+
+    if (apiKey.isEmpty()) {
+        apiKey = sm.apiKey("openai");
+        endpoint = "https://api.openai.com/v1/audio/transcriptions";
+        modelName = "whisper-1";
+    }
+
+    if (apiKey.isEmpty()) {
+        callback(false, QString(), "Please configure an OpenAI or Groq API key in Settings to use voice transcription.");
+        return;
+    }
+
+    auto *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+
+    QHttpPart modelPart;
+    modelPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"model\""));
+    modelPart.setBody(modelName.toUtf8());
+    multiPart->append(modelPart);
+
+    auto *file = new QFile(audioFilePath);
+    if (!file->open(QIODevice::ReadOnly)) {
+        delete file;
+        delete multiPart;
+        callback(false, QString(), "Failed to open audio recording file.");
+        return;
+    }
+
+    QHttpPart filePart;
+    filePart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("audio/m4a"));
+    filePart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"file\"; filename=\"recording.m4a\""));
+    filePart.setBodyDevice(file);
+    file->setParent(multiPart);
+    multiPart->append(filePart);
+
+    QNetworkRequest request{QUrl(endpoint)};
+    request.setRawHeader("Authorization", "Bearer " + apiKey.toUtf8());
+
+    QNetworkReply *reply = m_nam->post(request, multiPart);
+    multiPart->setParent(reply);
+
+    QObject::connect(reply, &QNetworkReply::finished, [reply, callback]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            callback(false, QString(), reply->errorString());
+            return;
+        }
+
+        const auto doc = QJsonDocument::fromJson(reply->readAll());
+        const QString text = doc.object().value("text").toString().trimmed();
+        if (text.isEmpty()) {
+            callback(false, QString(), "No transcription text returned.");
+        } else {
+            callback(true, text, QString());
+        }
     });
 }
 

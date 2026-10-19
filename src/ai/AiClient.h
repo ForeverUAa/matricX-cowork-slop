@@ -47,6 +47,10 @@ public:
     // Queries provider endpoint to fetch available models for current API key
     void fetchAvailableModels(const QString &providerId, ModelsCallback callback);
 
+    // Transcribes voice audio recording via Whisper API (Groq / OpenAI)
+    using TranscriptionCallback = std::function<void(bool success, const QString &text, const QString &error)>;
+    void transcribeAudio(const QString &audioFilePath, TranscriptionCallback callback);
+
 private:
     void sendGemini(const QList<ChatMessage> &history,
                     const QJsonArray &toolDefinitions,

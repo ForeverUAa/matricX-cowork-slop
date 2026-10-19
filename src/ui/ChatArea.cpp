@@ -200,8 +200,27 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     connect(m_micBtn, &QAbstractButton::clicked, this, [this] {
         if (m_micBtn->state() == MicButton::Recording) {
             m_micBtn->setState(MicButton::Idle);
+            updateStatusIndicator("Transcribing audio...", true);
+            m_audioRecorder.stopRecording([this](bool ok, const QString &filePath, const QString &err) {
+                if (!ok) {
+                    updateStatusIndicator(QString("Voice recording failed: %1").arg(err), false);
+                    return;
+                }
+                m_ai.transcribeAudio(filePath, [this](bool success, const QString &text, const QString &txErr) {
+                    if (success && !text.isEmpty()) {
+                        m_input->setText(text);
+                        updateStatusIndicator(QString(), false);
+                        m_input->setFocus();
+                        updateSendButtonState();
+                    } else {
+                        updateStatusIndicator(QString("Transcription failed: %1").arg(txErr), false);
+                    }
+                });
+            });
         } else {
             m_micBtn->setState(MicButton::Recording);
+            m_audioRecorder.startRecording();
+            updateStatusIndicator("Listening... Click mic again to transcribe", true);
         }
     });
 

@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Network)
+find_package(Qt6 COMPONENTS Multimedia QUIET)
 
 set(SRC_AI
     src/ai/AiClient.cpp
@@ -18,6 +19,8 @@ set(SRC_AI
 set(SRC_CORE
     src/core/Assets.cpp
     src/core/Assets.h
+    src/core/AudioRecorder.cpp
+    src/core/AudioRecorder.h
     src/core/Icons.cpp
     src/core/Icons.h
     src/core/ProviderKeyManager.cpp
@@ -78,6 +81,11 @@ add_executable(m_cowork_ui
 
 target_include_directories(m_cowork_ui PRIVATE src)
 target_link_libraries(m_cowork_ui PRIVATE Qt6::Widgets Qt6::Svg Qt6::Network)
+
+if(TARGET Qt6::Multimedia)
+    target_link_libraries(m_cowork_ui PRIVATE Qt6::Multimedia)
+    target_compile_definitions(m_cowork_ui PRIVATE MCW_HAS_MULTIMEDIA=1)
+endif()
 
 if(WIN32)
     target_link_libraries(m_cowork_ui PRIVATE dwmapi)
