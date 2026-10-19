@@ -15,6 +15,7 @@ namespace mcw {
 struct ChatMessage {
     QString role;      // "user", "assistant", or "model"
     QString content;
+    QString imagePath; // Optional path to image attachment (e.g. from screenshot tool)
 };
 
 struct ToolCallRequest {

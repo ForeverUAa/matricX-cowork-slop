@@ -1,6 +1,7 @@
 #include "ai/AiClient.h"
 #include "ai/AntigravityAuth.h"
 
+#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -63,6 +64,19 @@ void AiClient::sendGemini(const QList<ChatMessage> &history,
         QJsonObject part;
         part["text"] = msg.content;
         parts.append(part);
+
+        if (!msg.imagePath.isEmpty()) {
+            QFile imgFile(msg.imagePath);
+            if (imgFile.open(QIODevice::ReadOnly)) {
+                QJsonObject inlineData;
+                inlineData["mimeType"] = "image/png";
+                inlineData["data"] = QString::fromLatin1(imgFile.readAll().toBase64());
+                QJsonObject imgPart;
+                imgPart["inlineData"] = inlineData;
+                parts.append(imgPart);
+            }
+        }
+
         contentItem["parts"] = parts;
         contents.append(contentItem);
     }
@@ -199,7 +213,29 @@ void AiClient::sendOpenAiCompatible(const QList<ChatMessage> &history,
     for (const auto &msg : history) {
         QJsonObject m;
         m["role"] = msg.role;
-        m["content"] = msg.content;
+        if (!msg.imagePath.isEmpty()) {
+            QFile imgFile(msg.imagePath);
+            if (imgFile.open(QIODevice::ReadOnly)) {
+                QJsonArray contentArr;
+                QJsonObject textPart;
+                textPart["type"] = "text";
+                textPart["text"] = msg.content;
+                contentArr.append(textPart);
+
+                QJsonObject imgPart;
+                imgPart["type"] = "image_url";
+                QJsonObject urlObj;
+                urlObj["url"] = "data:image/png;base64," + QString::fromLatin1(imgFile.readAll().toBase64());
+                imgPart["image_url"] = urlObj;
+                contentArr.append(imgPart);
+
+                m["content"] = contentArr;
+            } else {
+                m["content"] = msg.content;
+            }
+        } else {
+            m["content"] = msg.content;
+        }
         messages.append(m);
     }
     reqObj["messages"] = messages;
@@ -299,7 +335,31 @@ void AiClient::sendAnthropic(const QList<ChatMessage> &history,
     for (const auto &msg : history) {
         QJsonObject m;
         m["role"] = (msg.role == "user") ? "user" : "assistant";
-        m["content"] = msg.content;
+        if (!msg.imagePath.isEmpty()) {
+            QFile imgFile(msg.imagePath);
+            if (imgFile.open(QIODevice::ReadOnly)) {
+                QJsonArray contentArr;
+                QJsonObject textPart;
+                textPart["type"] = "text";
+                textPart["text"] = msg.content;
+                contentArr.append(textPart);
+
+                QJsonObject imgPart;
+                imgPart["type"] = "image";
+                QJsonObject srcObj;
+                srcObj["type"] = "base64";
+                srcObj["media_type"] = "image/png";
+                srcObj["data"] = QString::fromLatin1(imgFile.readAll().toBase64());
+                imgPart["source"] = srcObj;
+                contentArr.append(imgPart);
+
+                m["content"] = contentArr;
+            } else {
+                m["content"] = msg.content;
+            }
+        } else {
+            m["content"] = msg.content;
+        }
         messages.append(m);
     }
     reqObj["messages"] = messages;

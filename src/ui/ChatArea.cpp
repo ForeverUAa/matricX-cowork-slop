@@ -639,7 +639,12 @@ void ChatArea::executeNextToolCall(const QList<ToolCallRequest> &calls, int inde
                                                toolResultStr, imgPath);
             }
 
-            m_history.append({"user", QString("Tool result for %1: %2").arg(tc.name, toolResultStr)});
+            // If the tool was screenshot, attach the image path so the AI model perceives the desktop
+            if (tc.name == "screenshot" && ok && !imgPath.isEmpty()) {
+                m_history.append({"user", QString("Tool result for %1: %2").arg(tc.name, toolResultStr), imgPath});
+            } else {
+                m_history.append({"user", QString("Tool result for %1: %2").arg(tc.name, toolResultStr), QString()});
+            }
             executeNextToolCall(calls, index + 1);
         });
     };
