@@ -1,7 +1,6 @@
 #include "ui/ChatArea.h"
 
 #include <QFont>
-#include <functional>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QJsonArray>
@@ -9,7 +8,6 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
-#include <QLinearGradient>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
@@ -18,13 +16,12 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-#include "core/Assets.h"
 #include "core/Icons.h"
 #include "core/SessionManager.h"
 #include "core/SettingsManager.h"
 #include "core/ThemeManager.h"
+#include "widgets/ActionStepCard.h"
 #include "widgets/DotMatrixWordmark.h"
-#include "widgets/LiquidGlass.h"
 #include "widgets/MicButton.h"
 #include "widgets/ModelSelector.h"
 #include "widgets/WindowControls.h"
@@ -36,93 +33,170 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // Top Navigation & Window Controls Row
-    auto *top = new QHBoxLayout;
-    top->setContentsMargins(20, 12, 16, 0);
-    top->setSpacing(12);
+    // Top Navigation & Window Controls Bar
+    auto *topBar = new QHBoxLayout;
+    topBar->setContentsMargins(16, 12, 16, 8);
+    topBar->setSpacing(12);
 
-    // Agent status pill
+    m_uncollapseBtn = new QPushButton(this);
+    m_uncollapseBtn->setIcon(icons::icon(icons::IconType::PanelLeft, QColor(161, 161, 170)));
+    m_uncollapseBtn->setFixedSize(30, 30);
+    m_uncollapseBtn->setCursor(Qt::PointingHandCursor);
+    m_uncollapseBtn->setToolTip("Open Sidebar");
+    m_uncollapseBtn->setStyleSheet("QPushButton { background: transparent; border: none; border-radius: 6px; } QPushButton:hover { background: rgba(255,255,255,0.08); }");
+    m_uncollapseBtn->hide();
+    topBar->addWidget(m_uncollapseBtn);
+
+    m_threadTitleLabel = new QLabel(this);
+    m_threadTitleLabel->setStyleSheet("color: #f4f4f5; font-size: 14px; font-weight: 600;");
+    topBar->addWidget(m_threadTitleLabel);
+
     m_statusPill = new QLabel(this);
-    m_statusPill->setFixedHeight(26);
+    m_statusPill->setFixedHeight(24);
     m_statusPill->hide();
-    top->addWidget(m_statusPill, 0, Qt::AlignVCenter);
+    topBar->addWidget(m_statusPill);
 
-    top->addStretch();
+    topBar->addStretch();
 
-    // Sleeker macOS window buttons
-    m_controls = new WindowControls;
-    top->addWidget(m_controls, 0, Qt::AlignTop);
-    root->addLayout(top);
+    m_controls = new WindowControls(this);
+    topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+    root->addLayout(topBar);
 
-    // Center area (Dot-matrix wordmark placeholder)
-    m_wordmark = new DotMatrixWordmark(this);
-    root->addWidget(m_wordmark, 0);
-
-    // Messages scroll area
-    m_scroll = new QScrollArea;
+    // Center Message Stream (Codex centered column with max width 780px)
+    m_scroll = new QScrollArea(this);
     m_scroll->setWidgetResizable(true);
     m_scroll->setFrameShape(QFrame::NoFrame);
     m_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_scroll->setStyleSheet(
-        "QScrollArea{background:transparent;border:none;}"
-        "QScrollBar:vertical{background:transparent;width:8px;margin:2px;}"
-        "QScrollBar::handle:vertical{background:rgba(16, 185, 129, 0.4);border-radius:4px;min-height:30px;}"
-        "QScrollBar::handle:vertical:hover{background:rgba(16, 185, 129, 0.7);}"
-        "QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical{height:0;}");
-    m_scroll->viewport()->setAutoFillBackground(false);
+        "QScrollArea { background: transparent; border: none; }"
+        "QScrollBar:vertical { background: transparent; width: 6px; margin: 2px; }"
+        "QScrollBar::handle:vertical { background: rgba(255, 255, 255, 0.15); border-radius: 3px; min-height: 30px; }"
+        "QScrollBar::handle:vertical:hover { background: rgba(255, 255, 255, 0.28); }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }");
 
-    auto *content = new QWidget;
-    content->setObjectName("msgContent");
-    content->setStyleSheet("#msgContent{background:transparent;}");
-    m_msgLayout = new QVBoxLayout(content);
-    m_msgLayout->setContentsMargins(60, 10, 60, 120);  // room so the last message clears the floating input bar
-    m_msgLayout->setSpacing(12);
+    m_scrollContent = new QWidget;
+    m_scrollContent->setStyleSheet("background: transparent;");
+
+    // Centered wrapper
+    auto *contentCenterRow = new QHBoxLayout(m_scrollContent);
+    contentCenterRow->setContentsMargins(0, 0, 0, 0);
+    contentCenterRow->addStretch();
+
+    auto *columnWidget = new QWidget(m_scrollContent);
+    columnWidget->setMaximumWidth(780);
+    columnWidget->setMinimumWidth(320);
+
+    m_msgLayout = new QVBoxLayout(columnWidget);
+    m_msgLayout->setContentsMargins(16, 16, 16, 20);
+    m_msgLayout->setSpacing(16);
+
+    // Empty state container
+    m_emptyStateWidget = new QWidget(columnWidget);
+    setupEmptyState(m_emptyStateWidget);
+    m_msgLayout->addWidget(m_emptyStateWidget);
+
     m_msgLayout->addStretch();
-    m_scroll->setWidget(content);
+
+    contentCenterRow->addWidget(columnWidget, 1);
+    contentCenterRow->addStretch();
+
+    m_scroll->setWidget(m_scrollContent);
     root->addWidget(m_scroll, 1);
 
-    // Bottom input bar: floats over the bottom of the (full-height) message list so messages
-    // scroll underneath the glass. Positioned manually in resizeEvent().
-    m_inputBar = new GlassFrame(18, this);
-    m_inputBar->setObjectName("bar");
-    m_inputBar->setFixedHeight(66);
-    auto *barLayout = new QHBoxLayout(m_inputBar);
-    barLayout->setContentsMargins(14, 0, 10, 0);
-    barLayout->setSpacing(10);
+    // Bottom Floating Input Capsule (Codex prompt bar)
+    auto *capsuleRow = new QHBoxLayout;
+    capsuleRow->setContentsMargins(24, 6, 24, 20);
+    capsuleRow->addStretch();
 
-    m_input = new QLineEdit;
-    m_input->setPlaceholderText("Ask M-Cowork anything, or type /tools...");
+    m_capsule = new QFrame(this);
+    m_capsule->setObjectName("promptCapsule");
+    m_capsule->setMaximumWidth(780);
+    m_capsule->setMinimumWidth(340);
+    m_capsule->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_capsule->setStyleSheet(
+        "QFrame#promptCapsule {"
+        "  background: #27272a;"
+        "  border: 1px solid #3f3f46;"
+        "  border-radius: 16px;"
+        "}"
+        "QFrame#promptCapsule:focus-within {"
+        "  border: 1px solid #10b981;"
+        "  background: #27272d;"
+        "}");
+
+    auto *capsuleLayout = new QVBoxLayout(m_capsule);
+    capsuleLayout->setContentsMargins(16, 12, 14, 10);
+    capsuleLayout->setSpacing(8);
+
+    // Text Input Row
+    m_input = new QLineEdit(m_capsule);
+    m_input->setPlaceholderText("Ask M-Cowork anything, or describe an OS automation task...");
     m_input->setStyleSheet(
         "QLineEdit {"
         "  background: transparent;"
         "  border: none;"
-        "  color: #f3f4f6;"
-        "  font-size: 16px;"
-        "  padding-left: 6px;"
+        "  color: #f4f4f5;"
+        "  font-size: 15px;"
+        "  padding: 0;"
         "}");
     QPalette pal = m_input->palette();
     pal.setColor(QPalette::PlaceholderText, QColor(140, 140, 150));
     m_input->setPalette(pal);
-    barLayout->addWidget(m_input, 1);
+    capsuleLayout->addWidget(m_input);
 
-    auto *divider = new QFrame;
-    divider->setFixedSize(2, 28);
-    divider->setStyleSheet("background: #3e3e46; border: none;");
-    barLayout->addWidget(divider);
+    // Bottom Controls Toolbar inside Capsule
+    auto *toolbar = new QHBoxLayout;
+    toolbar->setContentsMargins(0, 0, 0, 0);
+    toolbar->setSpacing(8);
 
-    // In-chat model indicator & selector placed right in the chatbox next to the mic button
-    m_modelSelector = new ModelSelector(this);
-    barLayout->addWidget(m_modelSelector);
+    // Model Selector pill on the left
+    m_modelSelector = new ModelSelector(m_capsule);
+    toolbar->addWidget(m_modelSelector, 0, Qt::AlignVCenter);
 
-    // Prototype accent recolored microphone
-    m_micBtn = new MicButton(this);
-    barLayout->addWidget(m_micBtn);
+    toolbar->addStretch();
 
-    m_inputBar->raise();
-    connect(m_scroll->verticalScrollBar(), &QScrollBar::valueChanged, m_inputBar, qOverload<>(&QWidget::update));
-    connect(m_scroll->verticalScrollBar(), &QScrollBar::rangeChanged, m_inputBar, qOverload<>(&QWidget::update));
+    // Microphone voice button
+    m_micBtn = new MicButton(m_capsule);
+    m_micBtn->setFixedSize(34, 34);
+    toolbar->addWidget(m_micBtn, 0, Qt::AlignVCenter);
 
+    // Codex Send button (circular up-arrow)
+    m_sendBtn = new QPushButton(m_capsule);
+    m_sendBtn->setFixedSize(34, 34);
+    m_sendBtn->setCursor(Qt::PointingHandCursor);
+    m_sendBtn->setIcon(icons::icon(icons::IconType::ArrowUp, QColor(24, 24, 27)));
+    m_sendBtn->setIconSize(QSize(16, 16));
+    m_sendBtn->setStyleSheet(
+        "QPushButton {"
+        "  background: #10b981;"
+        "  border: none;"
+        "  border-radius: 17px;"
+        "}"
+        "QPushButton:hover { background: #34d399; }"
+        "QPushButton:disabled { background: #3f3f46; }");
+    toolbar->addWidget(m_sendBtn, 0, Qt::AlignVCenter);
+
+    capsuleLayout->addLayout(toolbar);
+
+    capsuleRow->addWidget(m_capsule, 1);
+    capsuleRow->addStretch();
+    root->addLayout(capsuleRow);
+
+    // Event connections
     connect(m_input, &QLineEdit::returnPressed, this, [this] { send(); });
+    connect(m_input, &QLineEdit::textChanged, this, [this] { updateSendButtonState(); });
+
+    connect(m_sendBtn, &QPushButton::clicked, this, [this] {
+        if (m_busy) {
+            m_tool.endSession();
+            updateStatusIndicator("Session stopped.", false);
+            m_busy = false;
+            updateSendButtonState();
+        } else {
+            send();
+        }
+    });
+
     connect(m_micBtn, &QAbstractButton::clicked, this, [this] {
         if (m_micBtn->state() == MicButton::Recording) {
             m_micBtn->setState(MicButton::Idle);
@@ -136,32 +210,65 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
         SessionManager::instance().setSessionModel(currentSid, providerId, model);
     });
 
-    // Theme changes
-    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this] {
-        update();
-        m_inputBar->update();
+    connect(&SessionManager::instance(), &SessionManager::currentSessionChanged, this, &ChatArea::loadCurrentSession);
+    connect(&SessionManager::instance(), &SessionManager::messagesChanged, this, &ChatArea::loadCurrentSession);
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this] { update(); });
 
-    });
-
-    // Sessions sync
-    connect(&SessionManager::instance(), &SessionManager::currentSessionChanged, this, [this] {
-        loadCurrentSession();
-    });
-    connect(&SessionManager::instance(), &SessionManager::messagesChanged, this, [this] {
-        loadCurrentSession();
-    });
-
-    // Subtle 30 FPS ambient glow timer
-    connect(&m_animTimer, &QTimer::timeout, this, [this] {
-        m_pulsePhase += 0.08f;
-        if (m_pulsePhase > 6.28318f) m_pulsePhase -= 6.28318f;
-        if (!m_hasMessages || m_busy) {
-            update();
-        }
-    });
-    m_animTimer.start(66);
-
+    updateSendButtonState();
     loadCurrentSession();
+}
+
+void ChatArea::setupEmptyState(QWidget *container) {
+    auto *l = new QVBoxLayout(container);
+    l->setContentsMargins(0, 40, 0, 20);
+    l->setSpacing(18);
+    l->setAlignment(Qt::AlignCenter);
+
+    // Dot-matrix wordmark at top of empty dashboard
+    m_wordmark = new DotMatrixWordmark(container);
+    l->addWidget(m_wordmark, 0, Qt::AlignCenter);
+
+    auto *heading = new QLabel("What do you want to work on?", container);
+    heading->setAlignment(Qt::AlignCenter);
+    heading->setStyleSheet("color: #f4f4f5; font-size: 22px; font-weight: 600;");
+    l->addWidget(heading, 0, Qt::AlignCenter);
+
+    // Suggestion pills grid
+    auto *chipsLayout = new QHBoxLayout;
+    chipsLayout->setSpacing(10);
+    chipsLayout->setAlignment(Qt::AlignCenter);
+
+    auto createChip = [this, container](const QString &text, const QString &cmd) {
+        auto *btn = new QPushButton(text, container);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setStyleSheet(
+            "QPushButton {"
+            "  background: #27272a;"
+            "  color: #d4d4d8;"
+            "  border: 1px solid #3f3f46;"
+            "  border-radius: 18px;"
+            "  padding: 8px 16px;"
+            "  font-size: 13px;"
+            "  font-weight: 500;"
+            "}"
+            "QPushButton:hover {"
+            "  background: #323238;"
+            "  color: #ffffff;"
+            "  border-color: #52525b;"
+            "}");
+        connect(btn, &QPushButton::clicked, this, [this, cmd] {
+            m_input->setText(cmd);
+            send();
+        });
+        return btn;
+    };
+
+    chipsLayout->addWidget(createChip("⚡ Screen Info", "/tool screen_info"));
+    chipsLayout->addWidget(createChip("📷 Screenshot", "/tool screenshot"));
+    chipsLayout->addWidget(createChip("🖱 Click Center", "/tool mouse_click {\"x\":960,\"y\":540}"));
+    chipsLayout->addWidget(createChip("❓ All Tools", "/tools"));
+
+    l->addLayout(chipsLayout);
 }
 
 void ChatArea::focusInput() { m_input->setFocus(); }
@@ -171,6 +278,10 @@ void ChatArea::setCornerRadius(int radius) {
     update();
 }
 
+void ChatArea::setSidebarCollapsed(bool collapsed) {
+    m_uncollapseBtn->setVisible(collapsed);
+}
+
 void ChatArea::updateStatusIndicator(const QString &text, bool active) {
     if (text.isEmpty()) {
         m_statusPill->hide();
@@ -178,40 +289,39 @@ void ChatArea::updateStatusIndicator(const QString &text, bool active) {
         m_statusPill->setText(text);
         if (active) {
             m_statusPill->setStyleSheet(
-                "background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.5);"
-                "border-radius: 13px; color: #34d399; font-size: 11px; font-weight: 600; padding: 0 10px;");
+                "background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4);"
+                "border-radius: 12px; color: #34d399; font-size: 11px; font-weight: 600; padding: 2px 10px;");
         } else {
             m_statusPill->setStyleSheet(
-                "background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(56, 189, 248, 0.3);"
-                "border-radius: 13px; color: #38bdf8; font-size: 11px; font-weight: 600; padding: 0 10px;");
+                "background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4);"
+                "border-radius: 12px; color: #38bdf8; font-size: 11px; font-weight: 600; padding: 2px 10px;");
         }
         m_statusPill->show();
     }
 }
 
+void ChatArea::updateSendButtonState() {
+    if (m_busy) {
+        m_sendBtn->setIcon(icons::icon(icons::IconType::Square, Qt::white));
+        m_sendBtn->setStyleSheet("QPushButton { background: #ef4444; border: none; border-radius: 17px; } QPushButton:hover { background: #dc2626; }");
+        m_sendBtn->setEnabled(true);
+        m_sendBtn->setToolTip("Stop agent");
+    } else {
+        const bool hasText = !m_input->text().trimmed().isEmpty();
+        m_sendBtn->setIcon(icons::icon(icons::IconType::ArrowUp, hasText ? QColor(24, 24, 27) : QColor(161, 161, 170)));
+        m_sendBtn->setStyleSheet(hasText
+            ? "QPushButton { background: #10b981; border: none; border-radius: 17px; } QPushButton:hover { background: #34d399; }"
+            : "QPushButton { background: #3f3f46; border: none; border-radius: 17px; }");
+        m_sendBtn->setEnabled(hasText);
+        m_sendBtn->setToolTip("Send message");
+    }
+}
+
 void ChatArea::loadCurrentSession() {
-    // Clear displayed message widgets
-    // Rows are nested QHBoxLayouts, so widgets must be deleted recursively;
-    // otherwise old labels linger as orphans and overlap the new ones.
-    std::function<void(QLayout *)> clearLayout = [&](QLayout *l) {
-        while (QLayoutItem *item = l->takeAt(0)) {
-            if (QWidget *w = item->widget()) {
-                w->hide();
-                w->deleteLater();
-            } else if (QLayout *child = item->layout()) {
-                clearLayout(child);
-            }
-            delete item;
-        }
-    };
-    while (m_msgLayout->count() > 1) {
-        QLayoutItem *item = m_msgLayout->takeAt(0);
-        if (QWidget *w = item->widget()) {
-            w->hide();
-            w->deleteLater();
-        } else if (QLayout *child = item->layout()) {
-            clearLayout(child);
-        }
+    // Clear displayed message widgets (except empty state and trailing stretch)
+    while (m_msgLayout->count() > 2) {
+        QLayoutItem *item = m_msgLayout->takeAt(1);
+        if (item->widget()) delete item->widget();
         delete item;
     }
 
@@ -219,7 +329,8 @@ void ChatArea::loadCurrentSession() {
     m_history.clear();
 
     m_hasMessages = !s.messages.isEmpty();
-    m_wordmark->setVisible(!m_hasMessages);
+    m_emptyStateWidget->setVisible(!m_hasMessages);
+    m_threadTitleLabel->setText(s.title.isEmpty() ? "New Chat" : s.title);
 
     for (const auto &msg : s.messages) {
         addMessage(msg.content, msg.role == "user");
@@ -238,82 +349,80 @@ void ChatArea::loadCurrentSession() {
     update();
 }
 
-QImage ChatArea::backdrop(const QRect &r, const QWidget *requester) const {
-    const qreal dpr = devicePixelRatioF();
-    QImage img(QSize(qRound(r.width() * dpr), qRound(r.height() * dpr)), QImage::Format_ARGB32_Premultiplied);
-    img.setDevicePixelRatio(dpr);
-    img.fill(Qt::transparent);
-    QPainter p(&img);
-    p.translate(-r.topLeft());
-    paintBackground(p);
-    // Glass outside the message list (the input bar) also refracts the messages behind it.
-    if (requester && m_scroll && m_scroll->isVisible() && !m_scroll->isAncestorOf(requester)) {
-        const QPoint off = m_scroll->mapTo(this, QPoint(0, 0));
-        m_scroll->render(&p, off, QRegion(r.translated(-off)), QWidget::DrawChildren);
-    }
-    return img;
-}
-
-void ChatArea::resizeEvent(QResizeEvent *e) {
-    QWidget::resizeEvent(e);
-    if (!m_inputBar) return;
-    const int h = 66, side = 60, bottom = 25;
-    m_inputBar->setGeometry(side, height() - bottom - h, qMax(100, width() - 2 * side), h);
-    m_inputBar->raise();
-}
-
 void ChatArea::paintEvent(QPaintEvent *) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    // Clip to rounded right corners
+    const bool dark = ThemeManager::instance().isDark();
+
     QPainterPath clip;
     clip.addRoundedRect(QRectF(-m_radius, 0, width() + m_radius, height()), m_radius, m_radius);
     p.setClipPath(clip);
-    paintBackground(p);
-}
-
-void ChatArea::paintBackground(QPainter &p) const {
-    const bool dark = ThemeManager::instance().isDark();
-    p.fillRect(rect(), dark ? QColor(14, 14, 16) : QColor(250, 250, 252));
-
-    // Smooth ambient bottom gradient with gentle sine pulsing
-    const float pulse = 0.85f + 0.15f * std::sin(m_pulsePhase);
-    const double gy = height() * 0.72;
-    QLinearGradient g(0, gy, 0, height());
-    if (dark) {
-        g.setColorAt(0, QColor(14, 14, 16, 0));
-        g.setColorAt(0.6, QColor(8, 45, 15, int(60 * pulse)));
-        g.setColorAt(1, QColor(16, 150, 40, int(110 * pulse)));
-    } else {
-        g.setColorAt(0, QColor(250, 250, 252, 0));
-        g.setColorAt(0.6, QColor(16, 185, 129, int(20 * pulse)));
-        g.setColorAt(1, QColor(16, 185, 129, int(50 * pulse)));
-    }
-    p.fillRect(QRectF(0, gy, width(), height() - gy + 1), QBrush(g));
+    p.fillRect(rect(), dark ? QColor(24, 24, 27) : QColor(255, 255, 255));
 }
 
 void ChatArea::addMessage(const QString &text, bool fromUser) {
     const bool dark = ThemeManager::instance().isDark();
-    auto *lbl = new GlassLabel(text, fromUser);
-    lbl->setWordWrap(true);
-    lbl->setMaximumWidth(580);
-    lbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    // no background/border here: the glass pane is painted by GlassLabel
-    lbl->setStyleSheet(
-        fromUser ? (dark ? "color: #ecfdf5; padding: 11px 16px; font-size: 15px;"
-                         : "color: #065f46; padding: 11px 16px; font-size: 15px;")
-                 : (dark ? "color: #f3f4f6; padding: 11px 16px; font-size: 15px;"
-                         : "color: #1e293b; padding: 11px 16px; font-size: 15px;"));
+
     auto *row = new QHBoxLayout;
     row->setContentsMargins(0, 0, 0, 0);
-    if (fromUser) row->addStretch();
-    row->addWidget(lbl);
-    if (!fromUser) row->addStretch();
+    row->setSpacing(10);
+
+    if (fromUser) {
+        row->addStretch();
+        auto *bubble = new QLabel(text, this);
+        bubble->setWordWrap(true);
+        bubble->setMaximumWidth(540);
+        bubble->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        bubble->setStyleSheet(
+            "background: #27272a; color: #f4f4f5; border: 1px solid #3f3f46;"
+            "border-radius: 14px; padding: 10px 16px; font-size: 14px; line-height: 1.45;");
+        row->addWidget(bubble);
+    } else {
+        auto *card = new QFrame(this);
+        card->setObjectName("assistantCard");
+        card->setStyleSheet(
+            "QFrame#assistantCard { background: transparent; border: none; }");
+        auto *cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(0, 0, 0, 0);
+        cardLayout->setSpacing(6);
+
+        // Header: Bot avatar + Name
+        auto *hdr = new QHBoxLayout;
+        hdr->setSpacing(6);
+        auto *botIcon = new QLabel(card);
+        botIcon->setPixmap(icons::pixmap(icons::IconType::Bot, QSize(18, 18), QColor(16, 185, 129)));
+        hdr->addWidget(botIcon);
+
+        auto *name = new QLabel("M-Cowork", card);
+        name->setStyleSheet("font-size: 13px; font-weight: 600; color: #f4f4f5;");
+        hdr->addWidget(name);
+        hdr->addStretch();
+        cardLayout->addLayout(hdr);
+
+        // Text body
+        auto *body = new QLabel(text, card);
+        body->setWordWrap(true);
+        body->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        body->setStyleSheet(dark ? "color: #e4e4e7; font-size: 14px; line-height: 1.5;"
+                                 : "color: #18181b; font-size: 14px; line-height: 1.5;");
+        cardLayout->addWidget(body);
+
+        row->addWidget(card, 1);
+    }
+
     m_msgLayout->insertLayout(m_msgLayout->count() - 1, row);
-    QTimer::singleShot(0, this, [this] {
+    QTimer::singleShot(10, this, [this] {
         m_scroll->verticalScrollBar()->setValue(m_scroll->verticalScrollBar()->maximum());
-        if (m_inputBar) m_inputBar->update();
+    });
+}
+
+void ChatArea::addActionCard(const QString &toolName, const QJsonObject &args) {
+    auto *card = new ActionStepCard(toolName, args, this);
+    m_currentActionCard = card;
+    m_msgLayout->insertWidget(m_msgLayout->count() - 1, card);
+    QTimer::singleShot(10, this, [this] {
+        m_scroll->verticalScrollBar()->setValue(m_scroll->verticalScrollBar()->maximum());
     });
 }
 
@@ -321,6 +430,7 @@ void ChatArea::send() {
     const QString t = m_input->text().trimmed();
     if (t.isEmpty() || m_busy) return;
     m_input->clear();
+    updateSendButtonState();
 
     const QString currentSid = SessionManager::instance().currentSessionId();
 
@@ -328,8 +438,8 @@ void ChatArea::send() {
         addMessage(t, true);
         const QString help = "Available commands:\n"
                              "• /tools — List available computer control tools\n"
-                             "• /tool <name> [json] — Execute a tool (e.g. /tool screen_info or /tool mouse_move {\"x\":500,\"y\":300})\n"
-                             "• /tool end_session — End active tool session\n"
+                             "• /tool <name> [json] — Execute an OS tool directly\n"
+                             "• /tool end_session — End active tool control session\n"
                              "• /help — Show this help message";
         addMessage(help, false);
         return;
@@ -381,29 +491,34 @@ void ChatArea::send() {
             args = doc.object();
         }
 
+        addActionCard(toolName, args);
+
         m_tool.call(toolName, args, [this, toolName](const QJsonObject &reply) {
             const bool ok = reply["ok"].toBool();
             QString text;
+            QString imgPath;
             if (ok) {
                 QJsonObject copy = reply;
                 copy.remove("id");
                 copy.remove("ok");
-                if (copy.isEmpty()) {
-                    text = QString("✓ %1 completed successfully").arg(toolName);
-                } else {
-                    text = QString("✓ %1 result:\n%2")
-                               .arg(toolName, QString::fromUtf8(QJsonDocument(copy).toJson(QJsonDocument::Indented)).trimmed());
+                if (copy.contains("path")) {
+                    imgPath = copy.value("path").toString();
+                }
+                text = QString::fromUtf8(QJsonDocument(copy).toJson(QJsonDocument::Indented)).trimmed();
+                if (m_currentActionCard) {
+                    m_currentActionCard->setStatus(ActionStepCard::Status::Success, text, imgPath);
                 }
             } else {
-                text = QString("✗ %1 failed: %2")
-                           .arg(toolName, reply["error"].toString("unknown error"));
+                text = reply["error"].toString("unknown error");
+                if (m_currentActionCard) {
+                    m_currentActionCard->setStatus(ActionStepCard::Status::Failed, text);
+                }
             }
-            addMessage(text, false);
         });
         return;
     }
 
-    // Regular conversation message -> Persist and run agent loop
+    // Regular message
     SessionManager::instance().appendMessage(currentSid, "user", t);
     m_history.append({"user", t});
 
@@ -413,6 +528,7 @@ void ChatArea::send() {
 void ChatArea::runAgentLoop() {
     m_busy = true;
     m_input->setEnabled(false);
+    updateSendButtonState();
     updateStatusIndicator("Thinking...", false);
 
     QJsonArray tools = m_tool.definitions();
@@ -423,6 +539,7 @@ void ChatArea::runAgentLoop() {
             m_busy = false;
             m_input->setEnabled(true);
             m_input->setFocus();
+            updateSendButtonState();
             updateStatusIndicator(QString(), false);
             SessionManager::instance().appendMessage(currentSid, "assistant", QString("Error: %1").arg(resp.errorMessage));
             return;
@@ -434,13 +551,10 @@ void ChatArea::runAgentLoop() {
         }
 
         if (resp.toolCalls.isEmpty()) {
-            if (m_toolUsed) {
-                m_toolUsed = false;
-                m_tool.call("end_session", QJsonObject(), [](const QJsonObject &) {});  // remove the green overlay
-            }
             m_busy = false;
             m_input->setEnabled(true);
             m_input->setFocus();
+            updateSendButtonState();
             updateStatusIndicator(QString(), false);
             return;
         }
@@ -456,14 +570,21 @@ void ChatArea::executeNextToolCall(const QList<ToolCallRequest> &calls, int inde
     }
 
     const auto &tc = calls[index];
-    m_toolUsed = true;
     updateStatusIndicator(QString("Executing: %1").arg(tc.name), true);
 
-    const QString currentSid = SessionManager::instance().currentSessionId();
-    SessionManager::instance().appendMessage(currentSid, "assistant", QString("⚙ Running tool: %1").arg(tc.name));
+    addActionCard(tc.name, tc.arguments);
 
-    m_tool.call(tc.name, tc.arguments, [this, calls, index, tc, currentSid](const QJsonObject &reply) {
-        QString toolResultStr = QString::fromUtf8(QJsonDocument(reply).toJson(QJsonDocument::Compact));
+    m_tool.call(tc.name, tc.arguments, [this, calls, index, tc](const QJsonObject &reply) {
+        const bool ok = reply["ok"].toBool();
+        QString imgPath;
+        if (reply.contains("path")) imgPath = reply.value("path").toString();
+        const QString toolResultStr = QString::fromUtf8(QJsonDocument(reply).toJson(QJsonDocument::Compact));
+
+        if (m_currentActionCard) {
+            m_currentActionCard->setStatus(ok ? ActionStepCard::Status::Success : ActionStepCard::Status::Failed,
+                                           toolResultStr, imgPath);
+        }
+
         m_history.append({"user", QString("Tool result for %1: %2").arg(tc.name, toolResultStr)});
         executeNextToolCall(calls, index + 1);
     });

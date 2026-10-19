@@ -32,6 +32,8 @@ set(SRC_CORE
 )
 
 set(SRC_WIDGETS
+    src/widgets/ActionStepCard.cpp
+    src/widgets/ActionStepCard.h
     src/widgets/CircleButton.cpp
     src/widgets/CircleButton.h
     src/widgets/DotMatrixWordmark.cpp

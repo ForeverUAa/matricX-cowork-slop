@@ -74,6 +74,9 @@ QString svgString(IconType type, const QColor &color, float strokeWidth) {
     case IconType::MoreVertical:
         pathData = "<circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"12\" cy=\"5\" r=\"1\"/><circle cx=\"12\" cy=\"19\" r=\"1\"/>";
         break;
+    case IconType::MoreHorizontal:
+        pathData = "<circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/><circle cx=\"5\" cy=\"12\" r=\"1\"/>";
+        break;
     case IconType::Plus:
         pathData = "<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>";
         break;
@@ -97,6 +100,39 @@ QString svgString(IconType type, const QColor &color, float strokeWidth) {
             "<rect width=\"16\" height=\"12\" x=\"4\" y=\"8\" rx=\"2\"/>"
             "<path d=\"M2 14h2\"/><path d=\"M20 14h2\"/>"
             "<path d=\"M15 13v2\"/><path d=\"M9 13v2\"/>");
+        break;
+    case IconType::User:
+        // Lucide: user
+        pathData = QString(
+            "<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\"/>"
+            "<circle cx=\"12\" cy=\"7\" r=\"4\"/>");
+        break;
+    case IconType::Terminal:
+        // Lucide: terminal
+        pathData = QString(
+            "<polyline points=\"4 17 10 11 4 5\"/>"
+            "<line x1=\"12\" x2=\"20\" y1=\"19\" y2=\"19\"/>");
+        break;
+    case IconType::Image:
+        // Lucide: image
+        pathData = QString(
+            "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\"/>"
+            "<circle cx=\"9\" cy=\"9\" r=\"2\"/>"
+            "<path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\"/>");
+        break;
+    case IconType::PanelLeft:
+        // Lucide: panel-left
+        pathData = QString(
+            "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/>"
+            "<path d=\"M9 3v18\"/>");
+        break;
+    case IconType::ArrowUp:
+        // Lucide: arrow-up
+        pathData = "<path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/>";
+        break;
+    case IconType::Square:
+        // Lucide: square
+        pathData = "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/>";
         break;
     case IconType::Key:
         pathData = QString(

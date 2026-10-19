@@ -47,6 +47,14 @@ MainWindow::MainWindow() {
     h->addWidget(m_sidebar);
     h->addWidget(m_chat, 1);
 
+    // Wire sidebar collapsing between sidebar and chat header button
+    connect(m_sidebar, &Sidebar::collapsedChanged, this, [this](bool collapsed) {
+        m_chat->setSidebarCollapsed(collapsed);
+    });
+    connect(m_chat->uncollapseButton(), &QPushButton::clicked, this, [this] {
+        m_sidebar->setCollapsed(false);
+    });
+
     WindowControls *controls = m_chat->windowControls();
     connect(controls->maxBtn, &QAbstractButton::clicked, this, [this] {
         toggleMaximize();

@@ -1,53 +1,50 @@
 #pragma once
 
-#include <QHash>
-#include <QPointer>
+#include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
-#include <QRect>
 #include <QScrollArea>
 #include <QVBoxLayout>
 #include <QWidget>
 
-class QPropertyAnimation;
-
 namespace mcw {
 
-class IconButton;
-
-// Left panel: "Chats" heading, session creation, active session items with archive/delete menus, and settings button.
+// OpenAI Codex-style sidebar: collapsible, search filter, clean session list, user/settings footer.
 class Sidebar : public QWidget {
     Q_OBJECT
-    Q_PROPERTY(QRect pillGeometry READ pillGeometry WRITE setPillGeometry)
-
 public:
     explicit Sidebar(QWidget *parent = nullptr);
 
     QPushButton *settingsButton() const { return m_settingsBtn; }
+    QPushButton *toggleButton() const { return m_toggleBtn; }
     void setCornerRadius(int radius);
-    QRect pillGeometry() const { return m_pillGeometry; }
-    void setPillGeometry(const QRect &geometry);
+
+    bool isCollapsed() const { return m_collapsed; }
+    void setCollapsed(bool collapsed);
 
 public slots:
     void refreshSessions();
 
-protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
-    void leaveEvent(QEvent *event) override;
-    void paintEvent(QPaintEvent *event) override;
+signals:
+    void collapsedChanged(bool collapsed);
 
 private:
     void showSessionMenu(const QString &sessionId, const QPoint &pos);
-    void movePillTo(QWidget *target, bool immediate = false);
-    void registerNavTarget(QWidget *target);
+    void updateTheme();
 
+    bool m_collapsed = false;
+    int m_expandedWidth = 240;
+
+    QPushButton *m_toggleBtn = nullptr;
+    QPushButton *m_newThreadBtn = nullptr;
+    QLineEdit *m_searchEdit = nullptr;
+
+    QScrollArea *m_scrollArea = nullptr;
+    QWidget *m_scrollContent = nullptr;
     QVBoxLayout *m_sessionListLayout = nullptr;
+
     QPushButton *m_settingsBtn = nullptr;
-    QPushButton *m_newChatBtn = nullptr;
-    QPropertyAnimation *m_pillAnimation = nullptr;
-    QPointer<QWidget> m_selectedTarget;
-    QHash<QObject *, QPointer<QWidget>> m_navTargets;
-    QRect m_pillGeometry;
-    bool m_pillVisible = false;
+    QLabel *m_providerBadge = nullptr;
     int m_radius = 16;
 };
 

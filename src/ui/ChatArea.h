@@ -1,13 +1,13 @@
 #pragma once
 
 #include <QList>
+#include <QPushButton>
 #include <QString>
 #include <QTimer>
 #include <QWidget>
 
 #include "ai/AiClient.h"
 #include "core/Theme.h"
-#include "widgets/LiquidGlass.h"
 #include "tools/CoworkTool.h"
 
 class QLineEdit;
@@ -22,54 +22,62 @@ class WindowControls;
 class ModelSelector;
 class MicButton;
 class DotMatrixWordmark;
+class ActionStepCard;
 
-// Right panel: modern smooth UI with dot-matrix wordmark, in-chat model switching, and session sync.
-class ChatArea : public QWidget, public BackdropSource {
+// Right panel: OpenAI Codex-style canvas with centered stream, action cards, and floating input capsule.
+class ChatArea : public QWidget {
     Q_OBJECT
 public:
     explicit ChatArea(QWidget *parent = nullptr);
 
     WindowControls *windowControls() const { return m_controls; }
+    QPushButton *uncollapseButton() const { return m_uncollapseBtn; }
     void focusInput();
     void setCornerRadius(int radius);
 
-    // BackdropSource: what the liquid-glass panes refract
-    QImage backdrop(const QRect &rect, const QWidget *requester) const override;
-    QWidget *backdropWidget() override { return this; }
-
 public slots:
     void loadCurrentSession();
+    void setSidebarCollapsed(bool collapsed);
 
 protected:
     void paintEvent(QPaintEvent *) override;
-    void resizeEvent(QResizeEvent *e) override;
-    void paintBackground(QPainter &p) const;
 
 private:
+    void setupEmptyState(QWidget *container);
     void addMessage(const QString &text, bool fromUser);
+    void addActionCard(const QString &toolName, const QJsonObject &args);
     void updateStatusIndicator(const QString &text, bool active);
+    void updateSendButtonState();
     void send();
     void runAgentLoop();
     void executeNextToolCall(const QList<ToolCallRequest> &calls, int index);
 
+    QPushButton *m_uncollapseBtn = nullptr;
+    QLabel *m_threadTitleLabel = nullptr;
     WindowControls *m_controls = nullptr;
-    ModelSelector *m_modelSelector = nullptr;
+
     QScrollArea *m_scroll = nullptr;
+    QWidget *m_scrollContent = nullptr;
     QVBoxLayout *m_msgLayout = nullptr;
-    QLineEdit *m_input = nullptr;
-    QFrame *m_inputBar = nullptr;
-    QLabel *m_statusPill = nullptr;
-    MicButton *m_micBtn = nullptr;
+    QWidget *m_emptyStateWidget = nullptr;
     DotMatrixWordmark *m_wordmark = nullptr;
+
+    // Floating input capsule
+    QFrame *m_capsule = nullptr;
+    QLineEdit *m_input = nullptr;
+    ModelSelector *m_modelSelector = nullptr;
+    MicButton *m_micBtn = nullptr;
+    QPushButton *m_sendBtn = nullptr;
+    QLabel *m_statusPill = nullptr;
 
     bool m_hasMessages = false;
     CoworkTool m_tool;
     AiClient m_ai;
     QList<ChatMessage> m_history;
     bool m_busy = false;
-    bool m_toolUsed = false;
     int m_radius = theme::kWindowRadius;
 
+    ActionStepCard *m_currentActionCard = nullptr;
     float m_pulsePhase = 0.0f;
     QTimer m_animTimer;
 };

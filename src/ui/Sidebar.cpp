@@ -1,280 +1,260 @@
 #include "ui/Sidebar.h"
 
-#include <QEasingCurve>
-#include <QEvent>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
-#include <QMouseEvent>
-#include <QTimer>
-#include <QPainter>
-#include <QPaintEvent>
-#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QScrollArea>
-#include <QStyle>
 #include <QVBoxLayout>
 
 #include "core/Icons.h"
 #include "core/SessionManager.h"
+#include "core/SettingsManager.h"
 #include "core/Theme.h"
 #include "core/ThemeManager.h"
-#include "widgets/OutlinedLabel.h"
 
 namespace mcw {
 
 Sidebar::Sidebar(QWidget *parent) : QWidget(parent) {
     setObjectName("sidebar");
     setAttribute(Qt::WA_StyledBackground, true);
-    setFixedWidth(theme::kSidebarWidth);
+    setFixedWidth(m_expandedWidth);
 
-    m_pillAnimation = new QPropertyAnimation(this, "pillGeometry", this);
-    m_pillAnimation->setDuration(220);
-    m_pillAnimation->setEasingCurve(QEasingCurve::OutCubic);
+    auto *root = new QVBoxLayout(this);
+    root->setContentsMargins(10, 12, 10, 12);
+    root->setSpacing(8);
 
-    auto *v = new QVBoxLayout(this);
-    v->setContentsMargins(12, 16, 12, 16);
-    v->setSpacing(10);
-    v->addSpacing(16);
+    // Top action bar: Toggle sidebar button + New thread button
+    auto *topBar = new QHBoxLayout;
+    topBar->setContentsMargins(2, 0, 2, 0);
+    topBar->setSpacing(6);
 
-    // Header row: Chats label + New Chat button
-    auto *headerRow = new QHBoxLayout;
-    headerRow->addWidget(new OutlinedLabel("Chats", 28), 0, Qt::AlignLeft);
-    headerRow->addStretch();
-
-    m_newChatBtn = new QPushButton;
-    m_newChatBtn->setIcon(icons::icon(icons::IconType::Plus, ThemeManager::instance().colors().accent));
-    m_newChatBtn->setFixedSize(30, 30);
-    m_newChatBtn->setCursor(Qt::PointingHandCursor);
-    m_newChatBtn->setToolTip("New Session");
-    m_newChatBtn->setStyleSheet(
-        "QPushButton { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; }"
-        "QPushButton:hover { background: rgba(16, 185, 129, 0.25); }");
-    connect(m_newChatBtn, &QPushButton::clicked, this, [] {
-        SessionManager::instance().createSession("New Session");
+    m_toggleBtn = new QPushButton(this);
+    m_toggleBtn->setIcon(icons::icon(icons::IconType::PanelLeft, QColor(161, 161, 170)));
+    m_toggleBtn->setFixedSize(32, 32);
+    m_toggleBtn->setCursor(Qt::PointingHandCursor);
+    m_toggleBtn->setToolTip("Toggle sidebar");
+    m_toggleBtn->setStyleSheet(
+        "QPushButton { background: transparent; border: none; border-radius: 6px; }"
+        "QPushButton:hover { background: rgba(255, 255, 255, 0.08); }");
+    connect(m_toggleBtn, &QPushButton::clicked, this, [this] {
+        setCollapsed(!m_collapsed);
     });
-    headerRow->addWidget(m_newChatBtn);
-    v->addLayout(headerRow);
+    topBar->addWidget(m_toggleBtn);
 
-    v->addSpacing(10);
+    topBar->addStretch();
 
-    // Scrollable active sessions list
-    auto *scroll = new QScrollArea;
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scroll->setStyleSheet("QScrollArea { background: transparent; border: none; }");
+    m_newThreadBtn = new QPushButton(this);
+    m_newThreadBtn->setIcon(icons::icon(icons::IconType::Plus, QColor(244, 244, 245)));
+    m_newThreadBtn->setFixedSize(32, 32);
+    m_newThreadBtn->setCursor(Qt::PointingHandCursor);
+    m_newThreadBtn->setToolTip("New Chat");
+    m_newThreadBtn->setStyleSheet(
+        "QPushButton { background: transparent; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px; }"
+        "QPushButton:hover { background: rgba(255, 255, 255, 0.08); }");
+    connect(m_newThreadBtn, &QPushButton::clicked, this, [] {
+        SessionManager::instance().createSession("New Chat");
+    });
+    topBar->addWidget(m_newThreadBtn);
+    root->addLayout(topBar);
 
-    auto *content = new QWidget;
-    content->setStyleSheet("background: transparent;");
-    m_sessionListLayout = new QVBoxLayout(content);
+    // Search bar
+    m_searchEdit = new QLineEdit(this);
+    m_searchEdit->setPlaceholderText("Search chats...");
+    m_searchEdit->setFixedHeight(32);
+    m_searchEdit->setStyleSheet(
+        "QLineEdit {"
+        "  background: rgba(255, 255, 255, 0.05);"
+        "  border: 1px solid rgba(255, 255, 255, 0.08);"
+        "  border-radius: 6px;"
+        "  color: #f4f4f5;"
+        "  font-size: 12px;"
+        "  padding: 0 10px;"
+        "}"
+        "QLineEdit:focus {"
+        "  border: 1px solid #10b981;"
+        "  background: rgba(255, 255, 255, 0.08);"
+        "}");
+    connect(m_searchEdit, &QLineEdit::textChanged, this, [this] { refreshSessions(); });
+    root->addWidget(m_searchEdit);
+
+    // Section label
+    auto *sectionLabel = new QLabel("Recent Chats", this);
+    sectionLabel->setStyleSheet("font-size: 11px; font-weight: 600; color: #71717a; padding: 4px 6px 0 6px;");
+    root->addWidget(sectionLabel);
+
+    // Sessions Scroll Area
+    m_scrollArea = new QScrollArea(this);
+    m_scrollArea->setWidgetResizable(true);
+    m_scrollArea->setFrameShape(QFrame::NoFrame);
+    m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_scrollArea->setStyleSheet("QScrollArea { background: transparent; border: none; }");
+
+    m_scrollContent = new QWidget;
+    m_scrollContent->setStyleSheet("background: transparent;");
+    m_sessionListLayout = new QVBoxLayout(m_scrollContent);
     m_sessionListLayout->setContentsMargins(0, 0, 0, 0);
-    m_sessionListLayout->setSpacing(6);
+    m_sessionListLayout->setSpacing(3);
     m_sessionListLayout->addStretch();
 
-    scroll->setWidget(content);
-    v->addWidget(scroll, 1);
+    m_scrollArea->setWidget(m_scrollContent);
+    root->addWidget(m_scrollArea, 1);
 
-    // Settings trigger button at bottom
-    m_settingsBtn = new QPushButton(" Settings");
-    m_settingsBtn->setIcon(icons::icon(icons::IconType::Gear, QColor(200, 200, 200)));
-    m_settingsBtn->setFixedHeight(38);
-    m_settingsBtn->setCursor(Qt::PointingHandCursor);
-    m_settingsBtn->setStyleSheet(
-        "QPushButton {"
-        "  background: transparent;"
-        "  color: #e5e7eb;"
-        "  border: none;"
-        "  border-radius: 6px;"
-        "  text-align: left;"
-        "  padding-left: 12px;"
-        "  font-size: 13px;"
-        "  font-weight: 500;"
+    // Bottom user / settings tile
+    auto *footerFrame = new QFrame(this);
+    footerFrame->setObjectName("footerFrame");
+    footerFrame->setFixedHeight(44);
+    footerFrame->setStyleSheet(
+        "QFrame#footerFrame {"
+        "  background: rgba(255, 255, 255, 0.03);"
+        "  border: 1px solid rgba(255, 255, 255, 0.06);"
+        "  border-radius: 8px;"
         "}"
-        "QPushButton:hover {"
-        "  color: #ffffff;"
+        "QFrame#footerFrame:hover {"
+        "  background: rgba(255, 255, 255, 0.06);"
         "}");
-    registerNavTarget(m_settingsBtn);
-    v->addWidget(m_settingsBtn);
+    auto *footerLayout = new QHBoxLayout(footerFrame);
+    footerLayout->setContentsMargins(10, 0, 10, 0);
+    footerLayout->setSpacing(8);
+
+    auto *avatarIcon = new QLabel(this);
+    avatarIcon->setPixmap(icons::pixmap(icons::IconType::User, QSize(16, 16), QColor(16, 185, 129)));
+    footerLayout->addWidget(avatarIcon);
+
+    m_providerBadge = new QLabel("M-Cowork", this);
+    m_providerBadge->setStyleSheet("color: #f4f4f5; font-size: 12px; font-weight: 600;");
+    footerLayout->addWidget(m_providerBadge, 1);
+
+    m_settingsBtn = new QPushButton(this);
+    m_settingsBtn->setIcon(icons::icon(icons::IconType::Gear, QColor(161, 161, 170)));
+    m_settingsBtn->setFixedSize(26, 26);
+    m_settingsBtn->setCursor(Qt::PointingHandCursor);
+    m_settingsBtn->setToolTip("Open Settings");
+    m_settingsBtn->setStyleSheet("background: transparent; border: none; border-radius: 4px;");
+    footerLayout->addWidget(m_settingsBtn);
+
+    root->addWidget(footerFrame);
 
     setCornerRadius(theme::kWindowRadius);
 
     connect(&SessionManager::instance(), &SessionManager::sessionsChanged, this, &Sidebar::refreshSessions);
     connect(&SessionManager::instance(), &SessionManager::currentSessionChanged, this, &Sidebar::refreshSessions);
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, &Sidebar::updateTheme);
 
+    updateTheme();
     refreshSessions();
+}
+
+void Sidebar::setCollapsed(bool collapsed) {
+    if (m_collapsed == collapsed) return;
+    m_collapsed = collapsed;
+    setFixedWidth(m_collapsed ? 54 : m_expandedWidth);
+
+    m_newThreadBtn->setVisible(!m_collapsed);
+    m_searchEdit->setVisible(!m_collapsed);
+    m_scrollArea->setVisible(!m_collapsed);
+    m_providerBadge->setVisible(!m_collapsed);
+
+    emit collapsedChanged(m_collapsed);
 }
 
 void Sidebar::setCornerRadius(int radius) {
     m_radius = radius;
-    setStyleSheet(QString("#sidebar {"
-                          "  background: #141417;"
-                          "  border-right: 1px solid #242428;"
-                          "  border-top-left-radius: %1px;"
-                          "  border-bottom-left-radius: %1px;"
-                          "}").arg(m_radius));
+    updateTheme();
+}
+
+void Sidebar::updateTheme() {
+    const bool dark = ThemeManager::instance().isDark();
+    setStyleSheet(QString(
+        "#sidebar {"
+        "  background: %1;"
+        "  border-right: 1px solid %2;"
+        "  border-top-left-radius: %3px;"
+        "  border-bottom-left-radius: %3px;"
+        "}"
+    ).arg(dark ? "#18181b" : "#f4f4f5",
+          dark ? "#27272a" : "#e4e4e7",
+          QString::number(m_radius)));
 }
 
 void Sidebar::refreshSessions() {
-    m_pillAnimation->stop();
-    m_selectedTarget.clear();
-    m_navTargets.clear();
-    m_pillVisible = false;
-    registerNavTarget(m_settingsBtn);
-
-    // Clear existing buttons except the final stretch
     while (m_sessionListLayout->count() > 1) {
         QLayoutItem *item = m_sessionListLayout->takeAt(0);
-        if (QWidget *w = item->widget()) {
-            w->hide();
-            w->deleteLater();  // may be inside its own clicked() slot
-        }
+        if (item->widget()) delete item->widget();
         delete item;
     }
 
     const auto sessions = SessionManager::instance().activeSessions();
     const QString currentId = SessionManager::instance().currentSessionId();
+    const QString filter = m_searchEdit ? m_searchEdit->text().trimmed().toLower() : QString();
 
     for (const auto &s : sessions) {
+        if (!filter.isEmpty() && !s.title.toLower().contains(filter)) {
+            continue;
+        }
+
         const bool isCurrent = (s.id == currentId);
 
         auto *itemFrame = new QFrame;
-        itemFrame->setObjectName("sessionCard");
-        itemFrame->setFixedHeight(36);
-        itemFrame->setStyleSheet(
-            "QFrame#sessionCard {"
-            "  background: transparent;"
-            "  border: none;"
+        itemFrame->setObjectName("threadItem");
+        itemFrame->setFixedHeight(34);
+        itemFrame->setStyleSheet(QString(
+            "QFrame#threadItem {"
+            "  background: %1;"
+            "  border: 1px solid %2;"
             "  border-radius: 6px;"
-            "}");
+            "}"
+            "QFrame#threadItem:hover {"
+            "  background: %3;"
+            "}"
+        ).arg(isCurrent ? "rgba(255, 255, 255, 0.08)" : "transparent",
+              isCurrent ? "rgba(16, 185, 129, 0.4)" : "transparent",
+              isCurrent ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.04)"));
+
         auto *row = new QHBoxLayout(itemFrame);
-        row->setContentsMargins(10, 0, 4, 0);
+        row->setContentsMargins(8, 0, 4, 0);
         row->setSpacing(6);
 
         auto *titleBtn = new QPushButton(s.title);
         titleBtn->setCursor(Qt::PointingHandCursor);
         titleBtn->setStyleSheet(QString(
             "QPushButton { background: transparent; border: none; text-align: left; color: %1; font-size: 13px; font-weight: %2; }"
-        ).arg(isCurrent ? "#10b981" : "#d1d5db", isCurrent ? "600" : "400"));
+        ).arg(isCurrent ? "#f4f4f5" : "#a1a1aa", isCurrent ? "600" : "400"));
         connect(titleBtn, &QPushButton::clicked, this, [s] {
             SessionManager::instance().setCurrentSession(s.id);
         });
         row->addWidget(titleBtn, 1);
 
-        // Overflow action menu button (...)
         auto *menuBtn = new QPushButton;
-        menuBtn->setIcon(icons::icon(icons::IconType::MoreVertical, QColor(140, 140, 140)));
-        menuBtn->setFixedSize(22, 22);
+        menuBtn->setIcon(icons::icon(icons::IconType::MoreHorizontal, QColor(161, 161, 170)));
+        menuBtn->setFixedSize(20, 20);
         menuBtn->setCursor(Qt::PointingHandCursor);
-        menuBtn->setStyleSheet("QPushButton { background: transparent; border: none; border-radius: 4px; } QPushButton:hover { background: #374151; }");
+        menuBtn->setStyleSheet("QPushButton { background: transparent; border: none; border-radius: 3px; } QPushButton:hover { background: rgba(255,255,255,0.1); }");
         connect(menuBtn, &QPushButton::clicked, this, [this, s, menuBtn] {
             showSessionMenu(s.id, menuBtn->mapToGlobal(QPoint(0, menuBtn->height())));
         });
         row->addWidget(menuBtn);
 
-        itemFrame->setProperty("sid", s.id);
-        itemFrame->setCursor(Qt::PointingHandCursor);
-        registerNavTarget(itemFrame);
         m_sessionListLayout->insertWidget(m_sessionListLayout->count() - 1, itemFrame);
-        if (isCurrent) m_selectedTarget = itemFrame;
     }
 
-    // Frames have no geometry until the layout has run; placing the pill now put it at (0,0).
-    m_sessionListLayout->activate();
-    QTimer::singleShot(0, this, [this] {
-        if (m_selectedTarget) movePillTo(m_selectedTarget, true);
-    });
-}
-
-void Sidebar::registerNavTarget(QWidget *target) {
-    target->setAttribute(Qt::WA_Hover, true);
-    target->installEventFilter(this);
-    m_navTargets.insert(target, target);
-
-    const auto children = target->findChildren<QWidget *>();
-    for (QWidget *child : children) {
-        child->setAttribute(Qt::WA_Hover, true);
-        child->installEventFilter(this);
-        m_navTargets.insert(child, target);
-    }
-}
-
-bool Sidebar::eventFilter(QObject *watched, QEvent *event) {
-    if (event->type() == QEvent::Enter) {
-        const QPointer<QWidget> target = m_navTargets.value(watched);
-        if (target) movePillTo(target);
-    } else if (event->type() == QEvent::MouseButtonRelease) {
-        // the whole row is clickable, not just the title text
-        auto *me = static_cast<QMouseEvent *>(event);
-        auto *w = qobject_cast<QWidget *>(watched);
-        if (w && me->button() == Qt::LeftButton && w->rect().contains(me->position().toPoint())) {
-            const QString sid = w->property("sid").toString();
-            if (!sid.isEmpty()) {
-                SessionManager::instance().setCurrentSession(sid);
-                return true;
-            }
-        }
-    }
-    return QWidget::eventFilter(watched, event);
-}
-
-void Sidebar::leaveEvent(QEvent *event) {
-    if (m_selectedTarget) {
-        movePillTo(m_selectedTarget);
-    } else {
-        m_pillVisible = false;
-        update();
-    }
-    QWidget::leaveEvent(event);
-}
-
-void Sidebar::movePillTo(QWidget *target, bool immediate) {
-    if (!target || target->width() < 20 || target->height() < 10) return;
-
-    QRect destination(target->mapTo(this, QPoint(0, 0)), target->size());
-    destination.setLeft(qMax(destination.left(), 6));
-    destination.setRight(qMin(destination.right(), width() - 7));
-    const int systemDuration = style()->styleHint(QStyle::SH_Widget_Animation_Duration);
-
-    m_pillAnimation->stop();
-    if (immediate || systemDuration == 0 || !m_pillVisible || !m_pillGeometry.isValid()) {
-        m_pillVisible = true;
-        setPillGeometry(destination);
-        return;
-    }
-
-    m_pillVisible = true;
-    m_pillAnimation->setStartValue(m_pillGeometry);
-    m_pillAnimation->setEndValue(destination);
-    m_pillAnimation->start();
-}
-
-void Sidebar::setPillGeometry(const QRect &geometry) {
-    m_pillGeometry = geometry;
-    update();
-}
-
-void Sidebar::paintEvent(QPaintEvent *event) {
-    QWidget::paintEvent(event);
-    if (!m_pillVisible || !m_pillGeometry.isValid()) return;
-
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(36, 36, 41));
-    painter.drawRoundedRect(m_pillGeometry, 7, 7);
+    // Update active provider name in footer
+    const QString p = SettingsManager::instance().provider();
+    const auto cfg = SettingsManager::providerConfig(p);
+    m_providerBadge->setText(cfg.name.split(' ').first());
 }
 
 void Sidebar::showSessionMenu(const QString &sessionId, const QPoint &pos) {
     QMenu menu(this);
     menu.setStyleSheet(
-        "QMenu { background: #222228; border: 1px solid #333338; border-radius: 6px; padding: 4px; }"
-        "QMenu::item { color: #f3f4f6; padding: 6px 16px; border-radius: 4px; font-size: 12px; }"
-        "QMenu::item:selected { background: #323238; color: #ffffff; }");
+        "QMenu { background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; padding: 4px; }"
+        "QMenu::item { color: #f4f4f5; padding: 6px 14px; border-radius: 4px; font-size: 12px; }"
+        "QMenu::item:selected { background: #3f3f46; color: #ffffff; }");
 
-    auto *archiveAct = menu.addAction(icons::icon(icons::IconType::Archive, QColor(200, 200, 200)), "Archive Session");
+    auto *archiveAct = menu.addAction(icons::icon(icons::IconType::Archive, QColor(200, 200, 200)), "Archive Chat");
     auto *deleteAct = menu.addAction(icons::icon(icons::IconType::Trash, QColor(239, 68, 68)), "Delete Permanently");
 
     connect(archiveAct, &QAction::triggered, this, [sessionId] {
@@ -282,14 +262,13 @@ void Sidebar::showSessionMenu(const QString &sessionId, const QPoint &pos) {
     });
 
     connect(deleteAct, &QAction::triggered, this, [this, sessionId] {
-        // Double confirmation for permanent deletion
-        auto res1 = QMessageBox::question(this, "Delete Session",
-            "Are you sure you want to delete this session? This action is permanent.",
+        auto res1 = QMessageBox::question(this, "Delete Chat",
+            "Delete this conversation permanently? This cannot be undone.",
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (res1 != QMessageBox::Yes) return;
 
-        auto res2 = QMessageBox::warning(this, "Final Confirmation",
-            "All messages in this session will be permanently erased. Proceed?",
+        auto res2 = QMessageBox::warning(this, "Confirm Permanent Deletion",
+            "Are you completely sure? All messages and attachments will be deleted.",
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (res2 == QMessageBox::Yes) {
             SessionManager::instance().deleteSessionPermanently(sessionId);
