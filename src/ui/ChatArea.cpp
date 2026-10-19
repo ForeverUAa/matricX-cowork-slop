@@ -512,8 +512,31 @@ void ChatArea::send() {
                              "• /tools — List available computer control tools\n"
                              "• /tool <name> [json] — Execute an OS tool directly\n"
                              "• /tool end_session — End active tool control session\n"
+                             "• /models — List available models for active provider\n"
+                             "• /clear — Clear messages in current session\n"
                              "• /help — Show this help message";
         addMessage(help, false);
+        return;
+    }
+
+    if (t == "/clear") {
+        SessionManager::instance().deleteSessionPermanently(currentSid);
+        SessionManager::instance().createSession("New Chat");
+        return;
+    }
+
+    if (t == "/models") {
+        addMessage(t, true);
+        const QString p = SettingsManager::instance().provider();
+        m_ai.fetchAvailableModels(p, [this, p](bool ok, const QStringList &models, const QString &err) {
+            if (ok && !models.isEmpty()) {
+                QString out = QString("Models for %1 (%2):\n").arg(p).arg(models.size());
+                for (const auto &m : models) out += QString("• %1\n").arg(m);
+                addMessage(out.trimmed(), false);
+            } else {
+                addMessage(QString("Failed to fetch models: %1").arg(err), false);
+            }
+        });
         return;
     }
 

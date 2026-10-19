@@ -1,4 +1,5 @@
 build/
+dist/
 *.bak
 *.exe
 *.o
