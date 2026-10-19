@@ -53,20 +53,17 @@ The computer-control engine communicates with the GUI via a JSON-lines protocol 
 ## Status
 
 ### Done
-- Qt 6 Widgets UI matching the prototype: sidebar, chat area, outlined "M-Cowork" title, input bar, gear and mic buttons.
-- Frameless rounded window with macOS-style hover symbols on the min/max/close buttons (yellow/green/red).
-- Native Windows behavior: drag, Aero Snap, resize edges, maximize, taskbar minimize.
-- Project structure: `src/` modules, `assets/`, `packages/`, `scripts/` (install, build, run, sync-cowork-tool).
-- `matricX-cowork` v0.4.0 rewritten as a JSON-lines computer-control tool (screenshot, mouse, keyboard, wait, end_session, `--describe` schemas, Esc to abort, idle timeout).
-- Client integration: `src/tools/CoworkTool` wrapper, `/tools` and `/tool <name> {json}` in the chat box.
-- AI provider: settings panel behind the gear (provider selection: Gemini, OpenAI, Claude, Groq, Ollama; API key, model, custom baseUrl; persisted via QSettings).
-
-### Left
-- Test mouse_click, drag, scroll and keyboard_type through the client (only screen_info, mouse_move, screenshot and error paths were tested).
-- Test `/tool` end to end from the chat box.
-- Agent loop: send `definitions()` to the model, run its tool calls through `CoworkTool`, feed results back (screenshots as images).
-- Real chat history in the sidebar, multiple chats, message persistence.
-- Streaming responses, markdown rendering, error and retry UI.
-- Mic button: voice input.
-- Permission prompt before the AI takes control; stop button in the client.
-- Installer or packaged release; commit and push (nothing committed yet).
+- Cross-platform Qt 6 Widgets UI matching the OpenAI Codex / ChatGPT Desktop design: collapsible sidebar, centered chat canvas, floating input capsule, sleek macOS window controls.
+- Linux and Windows support: Linux X11/Wayland automation engine + native Win32 computer control.
+- Cross-platform CMake and PowerShell build systems (`scripts/build.sh`, `scripts/build.ps1`, `scripts/smoke-test.sh`).
+- `matricX-cowork` v0.4.0 JSON-lines computer-control tool (screenshot, mouse move/click/drag/scroll, keyboard type/key, wait, end_session, `--describe` schemas, Esc to abort, idle timeout).
+- Multimodal perception feedback loop: captures desktop screenshots and feeds them back directly as vision parts (base64) into Gemini, OpenAI, and Anthropic.
+- In-app OS control: `/tools`, `/tool <name> {json}`, and interactive `ActionStepCard` widgets with live status badges and screenshot previews.
+- Multiple providers supported: Google Gemini (with Google Antigravity OAuth), DeepSeek, OpenRouter, OpenAI, Anthropic Claude, Groq, Ollama.
+- Dynamic model autodetection (`⚡ Autodetect`) across all providers.
+- Multi-session lifecycle: persistent chat sessions, message storage, archive, restore, and 2-step permanent deletion.
+- In-chat model switcher pill with search and Lucide Bot icon.
+- Interactive safety confirmation: user permission prompt before executing OS actions.
+- Interactive error cards with one-click Retry.
+- Native markdown rendering and link handling for assistant messages.
+- Appearance settings: Dark, Light, and System / Auto theme modes with immediate live updates.
