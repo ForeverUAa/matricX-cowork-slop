@@ -8,8 +8,7 @@ namespace mcw {
 
 CircleButton::CircleButton(Kind kind, const QColor &color, QWidget *parent)
     : QAbstractButton(parent), m_kind(kind), m_color(color) {
-    // Sleeker, smaller 14x14 button matching modern macOS styling
-    setFixedSize(14, 14);
+    setFixedSize(20, 20);  // bigger click target
     setCursor(Qt::PointingHandCursor);
 
     m_anim = new QPropertyAnimation(this, "hoverProgress", this);
@@ -48,6 +47,7 @@ void CircleButton::paintEvent(QPaintEvent *) {
     ink.setAlpha(int(240 * m_hoverProgress));
 
     p.translate(width() / 2.0, height() / 2.0);
+    p.scale(width() / 14.0, height() / 14.0);  // symbols were drawn for a 14px button
     p.setPen(QPen(ink, 1.3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     p.setBrush(Qt::NoBrush);
 

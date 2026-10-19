@@ -37,6 +37,7 @@ set(SRC_WIDGETS
     src/widgets/DotMatrixWordmark.cpp
     src/widgets/DotMatrixWordmark.h
     src/widgets/IconButton.cpp
+    src/widgets/LiquidGlass.cpp
     src/widgets/IconButton.h
     src/widgets/MicButton.cpp
     src/widgets/MicButton.h

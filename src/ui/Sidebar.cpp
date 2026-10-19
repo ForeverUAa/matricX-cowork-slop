@@ -7,6 +7,8 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMouseEvent>
+#include <QTimer>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QPropertyAnimation>
@@ -125,7 +127,10 @@ void Sidebar::refreshSessions() {
     // Clear existing buttons except the final stretch
     while (m_sessionListLayout->count() > 1) {
         QLayoutItem *item = m_sessionListLayout->takeAt(0);
-        if (item->widget()) delete item->widget();
+        if (QWidget *w = item->widget()) {
+            w->hide();
+            w->deleteLater();  // may be inside its own clicked() slot
+        }
         delete item;
     }
 
@@ -169,12 +174,18 @@ void Sidebar::refreshSessions() {
         });
         row->addWidget(menuBtn);
 
+        itemFrame->setProperty("sid", s.id);
+        itemFrame->setCursor(Qt::PointingHandCursor);
         registerNavTarget(itemFrame);
         m_sessionListLayout->insertWidget(m_sessionListLayout->count() - 1, itemFrame);
         if (isCurrent) m_selectedTarget = itemFrame;
     }
 
-    if (m_selectedTarget) movePillTo(m_selectedTarget, true);
+    // Frames have no geometry until the layout has run; placing the pill now put it at (0,0).
+    m_sessionListLayout->activate();
+    QTimer::singleShot(0, this, [this] {
+        if (m_selectedTarget) movePillTo(m_selectedTarget, true);
+    });
 }
 
 void Sidebar::registerNavTarget(QWidget *target) {
@@ -194,6 +205,17 @@ bool Sidebar::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::Enter) {
         const QPointer<QWidget> target = m_navTargets.value(watched);
         if (target) movePillTo(target);
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+        // the whole row is clickable, not just the title text
+        auto *me = static_cast<QMouseEvent *>(event);
+        auto *w = qobject_cast<QWidget *>(watched);
+        if (w && me->button() == Qt::LeftButton && w->rect().contains(me->position().toPoint())) {
+            const QString sid = w->property("sid").toString();
+            if (!sid.isEmpty()) {
+                SessionManager::instance().setCurrentSession(sid);
+                return true;
+            }
+        }
     }
     return QWidget::eventFilter(watched, event);
 }
@@ -209,9 +231,11 @@ void Sidebar::leaveEvent(QEvent *event) {
 }
 
 void Sidebar::movePillTo(QWidget *target, bool immediate) {
-    if (!target || !target->isVisible()) return;
+    if (!target || target->width() < 20 || target->height() < 10) return;
 
-    const QRect destination(target->mapTo(this, QPoint(0, 0)), target->size());
+    QRect destination(target->mapTo(this, QPoint(0, 0)), target->size());
+    destination.setLeft(qMax(destination.left(), 6));
+    destination.setRight(qMin(destination.right(), width() - 7));
     const int systemDuration = style()->styleHint(QStyle::SH_Widget_Animation_Duration);
 
     m_pillAnimation->stop();

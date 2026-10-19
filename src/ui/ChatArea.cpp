@@ -1,6 +1,7 @@
 #include "ui/ChatArea.h"
 
 #include <QFont>
+#include <functional>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QJsonArray>
@@ -23,6 +24,7 @@
 #include "core/SettingsManager.h"
 #include "core/ThemeManager.h"
 #include "widgets/DotMatrixWordmark.h"
+#include "widgets/LiquidGlass.h"
 #include "widgets/MicButton.h"
 #include "widgets/ModelSelector.h"
 #include "widgets/WindowControls.h"
@@ -73,28 +75,17 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     content->setObjectName("msgContent");
     content->setStyleSheet("#msgContent{background:transparent;}");
     m_msgLayout = new QVBoxLayout(content);
-    m_msgLayout->setContentsMargins(60, 10, 60, 10);
+    m_msgLayout->setContentsMargins(60, 10, 60, 120);  // room so the last message clears the floating input bar
     m_msgLayout->setSpacing(12);
     m_msgLayout->addStretch();
     m_scroll->setWidget(content);
     root->addWidget(m_scroll, 1);
 
-    // Bottom input bar
-    auto *barRow = new QHBoxLayout;
-    barRow->setContentsMargins(60, 8, 60, 25);
-    m_inputBar = new QFrame;
+    // Bottom input bar: floats over the bottom of the (full-height) message list so messages
+    // scroll underneath the glass. Positioned manually in resizeEvent().
+    m_inputBar = new GlassFrame(18, this);
     m_inputBar->setObjectName("bar");
     m_inputBar->setFixedHeight(66);
-    m_inputBar->setStyleSheet(
-        "QFrame#bar {"
-        "  background: #242428;"
-        "  border: 1.5px solid #383840;"
-        "  border-radius: 14px;"
-        "}"
-        "QFrame#bar:focus-within {"
-        "  border: 1.5px solid #10b981;"
-        "  background: #28282e;"
-        "}");
     auto *barLayout = new QHBoxLayout(m_inputBar);
     barLayout->setContentsMargins(14, 0, 10, 0);
     barLayout->setSpacing(10);
@@ -127,8 +118,9 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     m_micBtn = new MicButton(this);
     barLayout->addWidget(m_micBtn);
 
-    barRow->addWidget(m_inputBar);
-    root->addLayout(barRow);
+    m_inputBar->raise();
+    connect(m_scroll->verticalScrollBar(), &QScrollBar::valueChanged, m_inputBar, qOverload<>(&QWidget::update));
+    connect(m_scroll->verticalScrollBar(), &QScrollBar::rangeChanged, m_inputBar, qOverload<>(&QWidget::update));
 
     connect(m_input, &QLineEdit::returnPressed, this, [this] { send(); });
     connect(m_micBtn, &QAbstractButton::clicked, this, [this] {
@@ -146,21 +138,9 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
 
     // Theme changes
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this] {
-        const bool dark = ThemeManager::instance().isDark();
-        m_inputBar->setStyleSheet(QString(
-            "QFrame#bar {"
-            "  background: %1;"
-            "  border: 1.5px solid %2;"
-            "  border-radius: 14px;"
-            "}"
-            "QFrame#bar:focus-within {"
-            "  border: 1.5px solid #10b981;"
-            "  background: %3;"
-            "}"
-        ).arg(dark ? "#242428" : "#ffffff",
-              dark ? "#383840" : "#cbd5e1",
-              dark ? "#28282e" : "#ffffff"));
         update();
+        m_inputBar->update();
+
     });
 
     // Sessions sync
@@ -173,13 +153,13 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
 
     // Subtle 30 FPS ambient glow timer
     connect(&m_animTimer, &QTimer::timeout, this, [this] {
-        m_pulsePhase += 0.04f;
+        m_pulsePhase += 0.08f;
         if (m_pulsePhase > 6.28318f) m_pulsePhase -= 6.28318f;
         if (!m_hasMessages || m_busy) {
             update();
         }
     });
-    m_animTimer.start(33);
+    m_animTimer.start(66);
 
     loadCurrentSession();
 }
@@ -211,9 +191,27 @@ void ChatArea::updateStatusIndicator(const QString &text, bool active) {
 
 void ChatArea::loadCurrentSession() {
     // Clear displayed message widgets
+    // Rows are nested QHBoxLayouts, so widgets must be deleted recursively;
+    // otherwise old labels linger as orphans and overlap the new ones.
+    std::function<void(QLayout *)> clearLayout = [&](QLayout *l) {
+        while (QLayoutItem *item = l->takeAt(0)) {
+            if (QWidget *w = item->widget()) {
+                w->hide();
+                w->deleteLater();
+            } else if (QLayout *child = item->layout()) {
+                clearLayout(child);
+            }
+            delete item;
+        }
+    };
     while (m_msgLayout->count() > 1) {
         QLayoutItem *item = m_msgLayout->takeAt(0);
-        if (item->widget()) delete item->widget();
+        if (QWidget *w = item->widget()) {
+            w->hide();
+            w->deleteLater();
+        } else if (QLayout *child = item->layout()) {
+            clearLayout(child);
+        }
         delete item;
     }
 
@@ -240,16 +238,43 @@ void ChatArea::loadCurrentSession() {
     update();
 }
 
+QImage ChatArea::backdrop(const QRect &r, const QWidget *requester) const {
+    const qreal dpr = devicePixelRatioF();
+    QImage img(QSize(qRound(r.width() * dpr), qRound(r.height() * dpr)), QImage::Format_ARGB32_Premultiplied);
+    img.setDevicePixelRatio(dpr);
+    img.fill(Qt::transparent);
+    QPainter p(&img);
+    p.translate(-r.topLeft());
+    paintBackground(p);
+    // Glass outside the message list (the input bar) also refracts the messages behind it.
+    if (requester && m_scroll && m_scroll->isVisible() && !m_scroll->isAncestorOf(requester)) {
+        const QPoint off = m_scroll->mapTo(this, QPoint(0, 0));
+        m_scroll->render(&p, off, QRegion(r.translated(-off)), QWidget::DrawChildren);
+    }
+    return img;
+}
+
+void ChatArea::resizeEvent(QResizeEvent *e) {
+    QWidget::resizeEvent(e);
+    if (!m_inputBar) return;
+    const int h = 66, side = 60, bottom = 25;
+    m_inputBar->setGeometry(side, height() - bottom - h, qMax(100, width() - 2 * side), h);
+    m_inputBar->raise();
+}
+
 void ChatArea::paintEvent(QPaintEvent *) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-
-    const bool dark = ThemeManager::instance().isDark();
 
     // Clip to rounded right corners
     QPainterPath clip;
     clip.addRoundedRect(QRectF(-m_radius, 0, width() + m_radius, height()), m_radius, m_radius);
     p.setClipPath(clip);
+    paintBackground(p);
+}
+
+void ChatArea::paintBackground(QPainter &p) const {
+    const bool dark = ThemeManager::instance().isDark();
     p.fillRect(rect(), dark ? QColor(14, 14, 16) : QColor(250, 250, 252));
 
     // Smooth ambient bottom gradient with gentle sine pulsing
@@ -270,15 +295,16 @@ void ChatArea::paintEvent(QPaintEvent *) {
 
 void ChatArea::addMessage(const QString &text, bool fromUser) {
     const bool dark = ThemeManager::instance().isDark();
-    auto *lbl = new QLabel(text);
+    auto *lbl = new GlassLabel(text, fromUser);
     lbl->setWordWrap(true);
     lbl->setMaximumWidth(580);
     lbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // no background/border here: the glass pane is painted by GlassLabel
     lbl->setStyleSheet(
-        fromUser ? (dark ? "background: #064e3b; color: #ecfdf5; border: 1px solid #059669; border-radius: 12px; padding: 11px 16px; font-size: 15px; line-height: 1.4;"
-                         : "background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 12px; padding: 11px 16px; font-size: 15px; line-height: 1.4;")
-                 : (dark ? "background: #1f2937; color: #f3f4f6; border: 1px solid #374151; border-radius: 12px; padding: 11px 16px; font-size: 15px; line-height: 1.4;"
-                         : "background: #f1f5f9; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 12px; padding: 11px 16px; font-size: 15px; line-height: 1.4;"));
+        fromUser ? (dark ? "color: #ecfdf5; padding: 11px 16px; font-size: 15px;"
+                         : "color: #065f46; padding: 11px 16px; font-size: 15px;")
+                 : (dark ? "color: #f3f4f6; padding: 11px 16px; font-size: 15px;"
+                         : "color: #1e293b; padding: 11px 16px; font-size: 15px;"));
     auto *row = new QHBoxLayout;
     row->setContentsMargins(0, 0, 0, 0);
     if (fromUser) row->addStretch();
@@ -287,6 +313,7 @@ void ChatArea::addMessage(const QString &text, bool fromUser) {
     m_msgLayout->insertLayout(m_msgLayout->count() - 1, row);
     QTimer::singleShot(0, this, [this] {
         m_scroll->verticalScrollBar()->setValue(m_scroll->verticalScrollBar()->maximum());
+        if (m_inputBar) m_inputBar->update();
     });
 }
 
@@ -407,6 +434,10 @@ void ChatArea::runAgentLoop() {
         }
 
         if (resp.toolCalls.isEmpty()) {
+            if (m_toolUsed) {
+                m_toolUsed = false;
+                m_tool.call("end_session", QJsonObject(), [](const QJsonObject &) {});  // remove the green overlay
+            }
             m_busy = false;
             m_input->setEnabled(true);
             m_input->setFocus();
@@ -425,6 +456,7 @@ void ChatArea::executeNextToolCall(const QList<ToolCallRequest> &calls, int inde
     }
 
     const auto &tc = calls[index];
+    m_toolUsed = true;
     updateStatusIndicator(QString("Executing: %1").arg(tc.name), true);
 
     const QString currentSid = SessionManager::instance().currentSessionId();

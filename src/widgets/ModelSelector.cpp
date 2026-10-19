@@ -2,6 +2,7 @@
 
 #include <QCompleter>
 
+#include "core/Assets.h"
 #include "core/Icons.h"
 #include "core/SettingsManager.h"
 #include "core/ThemeManager.h"
@@ -20,8 +21,8 @@ ModelSelector::ModelSelector(QWidget *parent) : QWidget(parent) {
     m_combo = new QComboBox(this);
     m_combo->setEditable(true);
     m_combo->setInsertPolicy(QComboBox::NoInsert);
-    m_combo->setMinimumWidth(160);
-    m_combo->setMaximumWidth(230);
+    m_combo->setMinimumWidth(210);
+    m_combo->setMaximumWidth(300);
     m_combo->setFixedHeight(28);
 
     // Make lineEdit search-friendly
@@ -70,12 +71,9 @@ void ModelSelector::refreshModels() {
         "  background: %5;"
         "}"
         "QComboBox::down-arrow {"
-        "  width: 0;"
-        "  height: 0;"
-        "  border-left: 4px solid transparent;"
-        "  border-right: 4px solid transparent;"
-        "  border-top: 5px solid %6;"
-        "  margin-right: 2px;"
+        "  image: url(%6);"
+        "  width: 12px;"
+        "  height: 12px;"
         "}"
         "QComboBox QAbstractItemView {"
         "  background: %1;"
@@ -84,12 +82,12 @@ void ModelSelector::refreshModels() {
         "  selection-background-color: %4;"
         "  selection-color: #ffffff;"
         "}"
-    ).arg(dark ? "#26262b" : "#f1f5f9",
+    ).arg(dark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.6)",
           dark ? "#3f3f46" : "#cbd5e1",
           dark ? "#f3f4f6" : "#0f172a",
           c.accent.name(),
           dark ? "#1f1f24" : "#e2e8f0",
-          dark ? "#9ca3af" : "#64748b"));
+          QString(assets::path("icons/chevron-down.svg")).replace("\\", "/")));
 
     const QString currentP = SettingsManager::instance().provider();
     const QString currentM = SettingsManager::instance().model(currentP);
@@ -124,6 +122,7 @@ void ModelSelector::setSelectedModel(const QString &providerId, const QString &m
         if (data.value("provider").toString() == providerId && data.value("model").toString() == model) {
             m_updating = true;
             m_combo->setCurrentIndex(i);
+            if (m_combo->lineEdit()) m_combo->lineEdit()->setCursorPosition(0);
             m_updating = false;
             return;
         }

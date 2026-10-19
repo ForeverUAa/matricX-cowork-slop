@@ -5,6 +5,8 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QPalette>
+#include <QScreen>
 
 #include "core/Theme.h"
 #include "ui/ChatArea.h"
@@ -26,7 +28,12 @@ namespace mcw {
 MainWindow::MainWindow() {
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowMinMaxButtonsHint |
                    Qt::WindowSystemMenuHint);
-    setAttribute(Qt::WA_TranslucentBackground);
+    // Opaque window: translucent layered windows break native maximize/snap/resize.
+    // Rounded corners come from DWM (Windows 11) instead.
+    setAutoFillBackground(true);
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window, QColor(14, 14, 16));
+    setPalette(pal);
     setWindowTitle("M-Cowork");
     setMinimumSize(theme::kMinWidth, theme::kMinHeight);
     resize(theme::kDefaultWidth, theme::kDefaultHeight);
@@ -42,7 +49,7 @@ MainWindow::MainWindow() {
 
     WindowControls *controls = m_chat->windowControls();
     connect(controls->maxBtn, &QAbstractButton::clicked, this, [this] {
-        isMaximized() ? showNormal() : showMaximized();
+        toggleMaximize();
     });
     connect(controls->minBtn, &QAbstractButton::clicked, this, [this] { showMinimized(); });
     connect(controls->closeBtn, &QAbstractButton::clicked, this, [this] { close(); });
@@ -58,9 +65,13 @@ MainWindow::MainWindow() {
 void MainWindow::focusInput() { m_chat->focusInput(); }
 
 void MainWindow::updateCorners() {
-    const int r = (isMaximized() || isFullScreen()) ? 0 : theme::kWindowRadius;
+    const int r = 0;  // opaque window; DWM rounds the corners
     m_sidebar->setCornerRadius(r);
     m_chat->setCornerRadius(r);
+}
+
+void MainWindow::toggleMaximize() {
+    isMaximized() ? showNormal() : showMaximized();
 }
 
 void MainWindow::changeEvent(QEvent *e) {
@@ -78,6 +89,14 @@ void MainWindow::showEvent(QShowEvent *e) {
         SetWindowLongPtr(h, GWL_STYLE, st | WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
         SetWindowPos(h, nullptr, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        // Windows 11: let DWM round the corners (DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2)
+        if (HMODULE dwm = LoadLibraryW(L"dwmapi.dll")) {
+            using DwmSetFn = HRESULT(WINAPI *)(HWND, DWORD, LPCVOID, DWORD);
+            if (auto fn = reinterpret_cast<DwmSetFn>(GetProcAddress(dwm, "DwmSetWindowAttribute"))) {
+                const int pref = 2;
+                fn(h, 33, &pref, sizeof(pref));
+            }
+        }
     }
 #endif
 }
@@ -86,6 +105,7 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr
 #ifdef Q_OS_WIN
     if (eventType == "windows_generic_MSG") {
         MSG *msg = static_cast<MSG *>(message);
+
 
         if (msg->message == WM_NCCALCSIZE && msg->wParam) {
             // no native frame/caption is drawn; when maximized, trim the invisible resize border
@@ -150,7 +170,6 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr
 void MainWindow::keyPressEvent(QKeyEvent *e) {
     if (e->key() == Qt::Key_F11) {
         isFullScreen() ? showNormal() : showFullScreen();
-        updateCorners();
         e->accept();
         return;
     }

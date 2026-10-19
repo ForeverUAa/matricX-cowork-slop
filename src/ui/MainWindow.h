@@ -28,11 +28,14 @@ protected:
 
 private:
     void updateCorners();
+    void toggleMaximize();  // manual maximize: native WS_MAXIMIZE breaks translucent windows
 
     Sidebar *m_sidebar = nullptr;
     ChatArea *m_chat = nullptr;
     bool m_framed = false;
     bool m_dragging = false;
+    bool m_max = false;
+    QRect m_normalGeom;
     QPoint m_dragPosition;
 };
 

@@ -7,6 +7,7 @@
 
 #include "ai/AiClient.h"
 #include "core/Theme.h"
+#include "widgets/LiquidGlass.h"
 #include "tools/CoworkTool.h"
 
 class QLineEdit;
@@ -23,7 +24,7 @@ class MicButton;
 class DotMatrixWordmark;
 
 // Right panel: modern smooth UI with dot-matrix wordmark, in-chat model switching, and session sync.
-class ChatArea : public QWidget {
+class ChatArea : public QWidget, public BackdropSource {
     Q_OBJECT
 public:
     explicit ChatArea(QWidget *parent = nullptr);
@@ -32,11 +33,17 @@ public:
     void focusInput();
     void setCornerRadius(int radius);
 
+    // BackdropSource: what the liquid-glass panes refract
+    QImage backdrop(const QRect &rect, const QWidget *requester) const override;
+    QWidget *backdropWidget() override { return this; }
+
 public slots:
     void loadCurrentSession();
 
 protected:
     void paintEvent(QPaintEvent *) override;
+    void resizeEvent(QResizeEvent *e) override;
+    void paintBackground(QPainter &p) const;
 
 private:
     void addMessage(const QString &text, bool fromUser);
@@ -60,6 +67,7 @@ private:
     AiClient m_ai;
     QList<ChatMessage> m_history;
     bool m_busy = false;
+    bool m_toolUsed = false;
     int m_radius = theme::kWindowRadius;
 
     float m_pulsePhase = 0.0f;

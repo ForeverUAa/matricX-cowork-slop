@@ -37,7 +37,7 @@ foreach ($h in Get-ChildItem $src -Recurse -Filter *.h) {
         $o = Join-Path $obj ('moc_' + $h.BaseName + '.o')
         $objects += $o
         if ((-not (Test-Path $o)) -or ((Get-Item $o).LastWriteTime -lt (Get-Item $mocCpp).LastWriteTime)) {
-            & g++ -std=c++17 -O1 -Wall -I $src @cflags -c $mocCpp -o $o
+            & g++ -std=c++17 -O2 -Wall -I $src @cflags -c $mocCpp -o $o
             if ($LASTEXITCODE -ne 0) { throw "moc compilation failed: $($h.Name)" }
         }
     }
@@ -53,7 +53,7 @@ foreach ($cpp in Get-ChildItem $src -Recurse -Filter *.cpp) {
              ((Get-Item $o).LastWriteTime -lt $newestHeader)
     if ($stale) {
         Write-Host "compile  $rel"
-        & g++ -std=c++17 -O1 -Wall -I $src @cflags -c $cpp.FullName -o $o
+        & g++ -std=c++17 -O2 -Wall -I $src @cflags -c $cpp.FullName -o $o
         if ($LASTEXITCODE -ne 0) { throw "Compilation failed: $rel" }
     }
 }
