@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M-Cowork — Let your AI use your computer</title>
+<meta name="description" content="M-Cowork is a cross-platform desktop app that lets your AI see your screen and control your mouse and keyboard.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<nav>
+  <div class="logo"><span class="dots"><i class="r"></i><i class="y"></i><i class="g"></i></span> M-Cowork</div>
+  <div class="links">
+    <a href="#demo">Demo</a>
+    <a href="#models">Models</a>
+    <a href="#build">Build</a>
+    <a href="#status">Status</a>
+  </div>
+</nav>
+
+<main>
+  <section class="step hero in">
+    <div class="copy">
+      <p class="eyebrow fade">Qt 6 · C++17 · Windows &amp; Linux</p>
+      <h1>
+        <span class="ln" data-split>Let your AI</span>
+        <span class="ln outline" data-split>use your computer.</span>
+      </h1>
+      <p class="sub fade">M-Cowork is a desktop app that lets people use their AI like OpenCode. It sees the screen, moves the mouse and types on the keyboard.</p>
+      <div class="cta fade">
+        <a class="btn primary" href="#build">Get started</a>
+        <a class="btn" href="#demo">Watch it work</a>
+      </div>
+      <p class="hint fade">scroll to run the agent ↓</p>
+    </div>
+  </section>
+
+  <div id="demo">
+    <section class="step">
+      <div class="copy">
+        <p class="num fade">01 / 04</p>
+        <div class="tool fade"><i></i>screenshot <em>{"format":"png"}</em></div>
+        <h2 data-split>It sees your screen.</h2>
+        <p class="fade">One call captures the desktop and hands it back to the model as an image. The agent always knows what you would see.</p>
+      </div>
+    </section>
+
+    <section class="step">
+      <div class="copy">
+        <p class="num fade">02 / 04</p>
+        <div class="tool fade"><i></i>mouse_move <em>{"x":1104,"y":412}</em></div>
+        <h2 data-split>It moves the mouse.</h2>
+        <p class="fade">The model reads the screenshot, picks coordinates and the tool moves the real cursor there. Press Esc at any moment to abort.</p>
+      </div>
+    </section>
+
+    <section class="step">
+      <div class="copy">
+        <p class="num fade">03 / 04</p>
+        <div class="tool fade"><i></i>mouse_click <em>+</em> keyboard_type</div>
+        <h2 data-split>It clicks. It types.</h2>
+        <p class="fade">Clicks and keystrokes travel through the same JSON-lines protocol over standard I/O, so the UI and the engine stay cleanly separated.</p>
+      </div>
+    </section>
+
+    <section class="step">
+      <div class="copy">
+        <p class="num fade">04 / 04</p>
+        <div class="tool fade"><i></i>wait <em>→</em> end_session</div>
+        <h2 data-split>It waits. Then it stops.</h2>
+        <p class="fade">The agent lets the page settle, finishes the job and ends the session. An idle timeout is the safety net if anything hangs.</p>
+      </div>
+    </section>
+  </div>
+
+  <section id="models" class="step">
+    <div class="copy">
+      <p class="num fade">MODELS</p>
+      <h2 data-split>Bring your own model.</h2>
+      <p class="fade">Pick a provider in the settings panel, add your key, model and a custom base URL. Everything is stored locally.</p>
+      <div class="chips fade"><span>Gemini</span><span>OpenAI</span><span>Claude</span><span>Groq</span><span>Ollama</span></div>
+    </div>
+  </section>
+
+  <section id="build" class="step">
+    <div class="copy card">
+      <p class="num fade">BUILD</p>
+      <h2 data-split>Build it.</h2>
+      <p class="fade"><b>Windows</b> (MSYS2 UCRT64)</p>
+      <pre class="fade">.\scripts\install-packages.ps1
+.\scripts\build.ps1
+.\scripts\run.ps1</pre>
+      <p class="fade"><b>Linux</b></p>
+      <pre class="fade">./scripts/build.sh
+./scripts/run.sh</pre>
+    </div>
+  </section>
+
+  <section id="status" class="step">
+    <div class="copy card">
+      <p class="num fade">STATUS</p>
+      <h2 data-split>Where it stands.</h2>
+      <ul class="check fade">
+        <li class="done">Qt 6 UI, frameless window, native behavior</li>
+        <li class="done">Computer-control tool v0.4.0 + client wrapper</li>
+        <li class="done">AI provider settings panel</li>
+        <li>Agent loop with tool calls and screenshots</li>
+        <li>Chat history, streaming, markdown</li>
+        <li>Voice input and permission prompt</li>
+        <li>Installer / packaged release</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>M-Cowork · built with Qt 6 · <span class="mono">matricX-cowork</span></footer>
+</main>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
