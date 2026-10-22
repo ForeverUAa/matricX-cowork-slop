@@ -246,7 +246,76 @@ function drawLive(p, time) {
   rr(PX, PY, PW, PH, 18); g.strokeStyle = C.line; g.lineWidth = 1.5; g.stroke();
 }
 
-function drawScreen(p, time) {
+/* ---- build terminal (opens over the screen in the Build section) ---- */
+const TERM = [
+  { tab: 'PowerShell', prompt: 'PS matricX-cowork> ', lines: [
+    ['cmd', '.\\scripts\\install-packages.ps1', 1.0],
+    ['out', 'Installing Qt 6\u2026', .35], ['out', 'Installing CMake\u2026', .35], ['out', 'Installing Ninja\u2026', .35],
+    ['ok', 'All packages installed', .6],
+    ['cmd', '.\\scripts\\build.ps1', .8],
+    ['out', '-- Configuring done', .35],
+    ['bar', 'Compiling sources', 2.0],
+    ['ok', 'Build succeeded', .6],
+    ['cmd', '.\\scripts\\run.ps1', .8],
+    ['ok', 'M-Cowork started', 1.0],
+  ] },
+  { tab: 'bash', prompt: '$ ', lines: [
+    ['cmd', './scripts/build.sh', .8], ['bar', 'Compiling sources', 2.0], ['ok', 'Build succeeded', .6],
+    ['cmd', './scripts/run.sh', .8], ['ok', 'M-Cowork started', 1.0],
+  ] },
+];
+TERM.forEach(t => { let c = 0; t.lines.forEach(l => { l.start = c; c += l[2]; }); t.total = c; });
+const TERM_TOTAL = TERM[0].total + TERM[1].total;
+
+function drawTerminal(v, tp, time) {
+  const T = tp * TERM_TOTAL, ti = T < TERM[0].total ? 0 : 1;
+  const local = ti ? T - TERM[0].total : T, tm = TERM[ti], e = easeOut(v);
+  g.save();
+  g.fillStyle = `rgba(0,0,0,${.6 * e})`; g.fillRect(0, 0, W, H);
+  g.translate(W / 2, H / 2 + (1 - e) * 24); g.scale(.9 + .1 * e, .9 + .1 * e); g.translate(-W / 2, -H / 2);
+  g.globalAlpha = e;
+  const x = 110, y = 100, w = 1220, h = 700, F = `400 20px ${MONO}`;
+  rr(x, y, w, h, 16); g.fillStyle = '#07070a'; g.fill(); g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 1.5; g.stroke();
+  g.save(); rr(x, y, w, h, 16); g.clip();
+  g.fillStyle = '#0f0f14'; g.fillRect(x, y, w, 46);
+  [C.r, C.y, C.g].forEach((c, i) => { g.beginPath(); g.arc(x + 26 + i * 22, y + 23, 7, 0, 7); g.fillStyle = c; g.fill(); });
+  TERM.forEach((t, i) => {
+    const tx = x + 130 + i * 150;
+    rr(tx, y + 8, 140, 38, [10, 10, 0, 0]); g.fillStyle = i === ti ? '#07070a' : 'rgba(255,255,255,0)'; g.fill();
+    txt(t.tab, tx + 70, y + 32, `600 14px ${MONO}`, i === ti ? C.fg : C.mut, 'center');
+  });
+  const lh = 30, blink = Math.floor(time * 2) % 2 === 0;
+  let ly = y + 92;
+  const caret = cx => { g.fillStyle = C.fg; g.fillRect(cx + 2, ly - 18, 11, 22); };
+  tm.lines.forEach(l => {
+    if (local < l.start) return;
+    const k = clamp((local - l.start) / l[2]);
+    if (l[0] === 'cmd') {
+      txt(tm.prompt, x + 28, ly, F, C.g);
+      const pw = g.measureText(tm.prompt).width;
+      const s = l[1].slice(0, Math.floor(k * (l[1].length + .99)));
+      txt(s, x + 28 + pw, ly, F, C.fg);
+      if (k < 1) caret(x + 28 + pw + g.measureText(s).width);
+    } else if (l[0] === 'out') {
+      txt(l[1], x + 28, ly, F, C.mut);
+    } else if (l[0] === 'ok') {
+      txt('\u2713 ' + l[1], x + 28, ly, F, C.g);
+    } else {
+      rr(x + 28, ly - 14, 360, 12, 6); g.fillStyle = '#1b1b24'; g.fill();
+      if (k > .03) { rr(x + 28, ly - 14, 360 * k, 12, 6); g.fillStyle = k < 1 ? C.y : C.g; g.fill(); }
+      txt(Math.round(k * 100) + '%  ' + l[1], x + 410, ly, F, k < 1 ? C.y : C.g);
+    }
+    ly += lh;
+  });
+  if (local >= tm.total) {
+    txt(tm.prompt, x + 28, ly, F, C.g);
+    if (blink) caret(x + 28 + g.measureText(tm.prompt).width);
+  }
+  g.restore();
+  g.restore();
+}
+
+function drawScreen(p, time, termV = 0, termP = 0) {
   g.clearRect(0, 0, W, H);
   g.save(); rr(0, 0, W, H, 36); g.clip();
   g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
@@ -328,6 +397,7 @@ function drawScreen(p, time) {
   g.fillStyle = active ? C.g : '#444452'; g.globalAlpha = active ? .5 + .5 * Math.sin(time * 5) : 1; g.fill(); g.globalAlpha = 1;
 
   drawLive(p, time);
+  if (termV > .005) drawTerminal(termV, termP, time);
   g.restore();
 }
 
@@ -363,6 +433,32 @@ const glow = new THREE.Mesh(
 glow.position.z = -0.45; win.add(glow);
 scene.add(win);
 
+/* little original buddy that peeks from behind the screen */
+const buddy = new THREE.Group(); buddy.position.set(1.7, 1.1, -.35); win.add(buddy);
+const shell = new THREE.MeshStandardMaterial({ color: 0xdfe8f5, roughness: .45, metalness: .1, emissive: 0x0b1522 });
+const head = new THREE.Mesh(new THREE.SphereGeometry(.46, 32, 24), shell); head.scale.set(1.2, 1, .9); buddy.add(head);
+const faceM = new THREE.Mesh(new THREE.SphereGeometry(.34, 28, 20), new THREE.MeshStandardMaterial({ color: 0x090d14, roughness: .2 }));
+faceM.scale.set(1.25, .8, .5); faceM.position.set(0, -.02, .32); head.add(faceM);
+const eyes = [-.15, .15].map(ex => {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(.055, 16, 12), new THREE.MeshBasicMaterial({ color: 0x7fe9ff }));
+  m.position.set(ex, .02, .5); head.add(m); return m;
+});
+const ant = new THREE.Mesh(new THREE.CylinderGeometry(.018, .018, .28, 8), shell); ant.position.y = .56; head.add(ant);
+const tip = new THREE.Mesh(new THREE.SphereGeometry(.06, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfebc2e })); tip.position.y = .72; head.add(tip);
+const arm = new THREE.Group(); arm.position.set(.62, -.3, .05); buddy.add(arm);
+const limb = new THREE.Mesh(new THREE.CylinderGeometry(.05, .06, .62, 12), shell); limb.position.y = .31; arm.add(limb);
+const hand = new THREE.Mesh(new THREE.SphereGeometry(.11, 16, 12), shell); hand.position.y = .66; arm.add(hand);
+buddy.visible = false;
+
+const bc = document.createElement('canvas'); bc.width = 512; bc.height = 170;
+const bx = bc.getContext('2d');
+bx.fillStyle = '#f4f6fb'; bx.beginPath(); bx.roundRect(8, 8, 496, 120, 40); bx.fill();
+bx.beginPath(); bx.moveTo(430, 120); bx.lineTo(486, 120); bx.lineTo(480, 160); bx.closePath(); bx.fill();
+bx.fillStyle = '#0b0b10'; bx.font = '700 46px Inter, "Segoe UI", sans-serif'; bx.textAlign = 'center'; bx.fillText('Hi! Pick any model.', 256, 82);
+const bubbleTex = new THREE.CanvasTexture(bc); bubbleTex.colorSpace = THREE.SRGBColorSpace;
+const bubble = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.1 * 170 / 512), new THREE.MeshBasicMaterial({ map: bubbleTex, transparent: true, opacity: 0, toneMapped: false }));
+bubble.position.set(.1, 2.78, .3); bubble.visible = false; win.add(bubble);
+
 /* dark grid floor + dim particles */
 const grid = new THREE.GridHelper(70, 70, 0x1c1c25, 0x101016);
 grid.position.y = -3.6; scene.add(grid);
@@ -391,10 +487,17 @@ function mapS(s) {
   }
   return 1;
 }
-let demoT = 0, demoP = 0;
+const modelsEl = document.getElementById('models'), buildEl = document.getElementById('build');
+let demoT = 0, demoP = 0, peekT = 0, peek = 0, termVT = 0, termV = 0, termPT = 0, termP = 0;
 function onScroll() {
   const top = demo.getBoundingClientRect().top + scrollY;
   demoT = mapS((scrollY - top) / innerHeight);
+  const vh = innerHeight;
+  const ms = (scrollY - (modelsEl.getBoundingClientRect().top + scrollY)) / vh;
+  peekT = clamp((.85 - Math.abs(ms)) / .35);
+  const bs = (scrollY - (buildEl.getBoundingClientRect().top + scrollY)) / vh;
+  termVT = seg(bs, -.6, -.2) * (1 - seg(bs, 1.6, 2.0));
+  termPT = seg(bs, -.2, 1.6);
 }
 addEventListener('scroll', onScroll, { passive: true });
 
@@ -403,8 +506,8 @@ document.querySelectorAll('[data-split]').forEach(el => {
   const words = el.textContent.trim().split(/\s+/);
   el.innerHTML = words.map((w, i) => `<span class="w"><span style="transition-delay:${i * 70 + 80}ms">${w}</span></span>`).join(' ');
 });
-const io = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('in', e.isIntersecting)), { threshold: .35 });
-document.querySelectorAll('.step').forEach(s => io.observe(s));
+const io = new IntersectionObserver(es => es.forEach(e => e.target.closest('.step').classList.toggle('in', e.isIntersecting)), { threshold: .35 });
+document.querySelectorAll('.step .copy').forEach(s => io.observe(s));
 
 /* ================= interaction + loop ================= */
 const mouse = { x: 0, y: 0 };
@@ -420,6 +523,7 @@ let frameN = 0;
 function frame() {
   const t = clock.getElapsedTime();
   demoP += (demoT - demoP) * .1;
+  peek += (peekT - peek) * .08; termV += (termVT - termV) * .12; termP += (termPT - termP) * .1;
 
   const visH = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const visW = visH * camera.aspect;
@@ -432,7 +536,15 @@ function frame() {
   win.rotation.y = (narrow ? 0 : -.26) + mouse.x * .12;
   win.rotation.x = mouse.y * .08;
 
-  if (frameN++ % 2 === 0) { drawScreen(demoP, t); tex.needsUpdate = true; }
+  const pe = ease(peek);
+  buddy.visible = pe > .01;
+  buddy.position.y = lerp(1.1, 2.38, pe);
+  head.rotation.z = Math.sin(t * 2) * .05;
+  arm.rotation.z = -.55 + Math.sin(t * 9) * .4 * pe;
+  const eb = (t % 3.2) > 3.05 ? .1 : 1; eyes.forEach(m => { m.scale.y = eb; });
+  const ba = clamp((pe - .5) * 2); bubble.material.opacity = ba; bubble.scale.setScalar(.8 + .2 * ba); bubble.visible = ba > .01;
+
+  if (frameN++ % 2 === 0) { drawScreen(demoP, t, termV, termP); tex.needsUpdate = true; }
 
   points.rotation.y = t * .01 + mouse.x * .08;
   points.rotation.x = mouse.y * .05;

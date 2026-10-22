@@ -22,7 +22,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;justify-content:s
 
 /* every section: text on the left, screen lives on the right */
 .step{height:100vh;display:flex;align-items:center;padding:0 5vw}
-.step#build,.step#status,.step#models{height:auto;min-height:100vh}
+.step#status,.step#models{height:auto;min-height:100vh}
+.step#build{height:240vh;align-items:flex-start}
+#build .copy{position:sticky;top:16vh}
 .copy{width:min(500px,42vw)}
 .copy.card{background:rgba(8,8,11,.78);border:1px solid var(--line);border-radius:20px;padding:30px;backdrop-filter:blur(14px);box-shadow:0 30px 80px rgba(0,0,0,.6)}
 
@@ -74,4 +76,6 @@ footer{padding:60px 5vw 40px;color:#555566;font-size:13px}
   h2{font-size:32px;margin:10px 0 12px}
   .sub{font-size:15px;margin:16px 0 20px}
   .hint{display:none}
+  .step#build{align-items:flex-start;padding-bottom:0}
+  #build .copy{top:48vh}
 }
