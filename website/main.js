@@ -433,22 +433,32 @@ const glow = new THREE.Mesh(
 glow.position.z = -0.45; win.add(glow);
 scene.add(win);
 
-/* little original buddy that peeks from behind the screen */
-const buddy = new THREE.Group(); buddy.position.set(1.7, 1.1, -.35); win.add(buddy);
-const shell = new THREE.MeshStandardMaterial({ color: 0xdfe8f5, roughness: .45, metalness: .1, emissive: 0x0b1522 });
-const head = new THREE.Mesh(new THREE.SphereGeometry(.46, 32, 24), shell); head.scale.set(1.2, 1, .9); buddy.add(head);
-const faceM = new THREE.Mesh(new THREE.SphereGeometry(.34, 28, 20), new THREE.MeshStandardMaterial({ color: 0x090d14, roughness: .2 }));
-faceM.scale.set(1.25, .8, .5); faceM.position.set(0, -.02, .32); head.add(faceM);
-const eyes = [-.15, .15].map(ex => {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(.055, 16, 12), new THREE.MeshBasicMaterial({ color: 0x7fe9ff }));
-  m.position.set(ex, .02, .5); head.add(m); return m;
-});
-const ant = new THREE.Mesh(new THREE.CylinderGeometry(.018, .018, .28, 8), shell); ant.position.y = .56; head.add(ant);
-const tip = new THREE.Mesh(new THREE.SphereGeometry(.06, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfebc2e })); tip.position.y = .72; head.add(tip);
-const arm = new THREE.Group(); arm.position.set(.62, -.3, .05); buddy.add(arm);
-const limb = new THREE.Mesh(new THREE.CylinderGeometry(.05, .06, .62, 12), shell); limb.position.y = .31; arm.add(limb);
-const hand = new THREE.Mesh(new THREE.SphereGeometry(.11, 16, 12), shell); hand.position.y = .66; arm.add(hand);
-buddy.visible = false;
+/* Clawd — the orange Claude mascot — peeks from behind the screen */
+const clawd = new THREE.Group(); clawd.visible = false; win.add(clawd);
+
+const clawdMat = new THREE.MeshStandardMaterial({ color: 0xd97757, roughness: .55, metalness: .05 });
+const clawdEyeMat = new THREE.MeshStandardMaterial({ color: 0x171310, roughness: .3, metalness: .15 });
+
+function clawdBox(w, h, d, r, mat, x, y, z, parent) {
+  const geo = new THREE.ExtrudeGeometry(roundedShape(w, h, r), {
+    depth: d, bevelEnabled: true, bevelSize: .012, bevelThickness: .012, bevelSegments: 3, curveSegments: 10
+  });
+  geo.center();
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  (parent || clawd).add(m);
+  return m;
+}
+
+const CW = 1.06, CH = .66, CD = .5, CLEG = .2, CBODY = CLEG + CH / 2;
+clawdBox(CW, CH, CD, .17, clawdMat, 0, CBODY, 0);
+[-.35, -.19, .19, .35].forEach(lx => clawdBox(.13, CLEG + .02, .19, .055, clawdMat, lx, CLEG / 2, 0));
+const eyeL = clawdBox(.07, .22, .07, .03, clawdEyeMat, -.25, CBODY + .015, CD / 2);
+const eyeR = clawdBox(.07, .22, .07, .03, clawdEyeMat, .25, CBODY + .015, CD / 2);
+const armL = new THREE.Group(); armL.position.set(-(CW / 2 + .065), CBODY + .16, 0); clawd.add(armL);
+clawdBox(.13, .24, .22, .06, clawdMat, 0, -.115, 0, armL);
+const armR = new THREE.Group(); armR.position.set(CW / 2 + .065, CBODY + .16, 0); clawd.add(armR);
+clawdBox(.13, .24, .22, .06, clawdMat, 0, -.115, 0, armR);
 
 const bc = document.createElement('canvas'); bc.width = 512; bc.height = 170;
 const bx = bc.getContext('2d');
@@ -457,7 +467,7 @@ bx.beginPath(); bx.moveTo(430, 120); bx.lineTo(486, 120); bx.lineTo(480, 160); b
 bx.fillStyle = '#0b0b10'; bx.font = '700 46px Inter, "Segoe UI", sans-serif'; bx.textAlign = 'center'; bx.fillText('Hi! Pick any model.', 256, 82);
 const bubbleTex = new THREE.CanvasTexture(bc); bubbleTex.colorSpace = THREE.SRGBColorSpace;
 const bubble = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.1 * 170 / 512), new THREE.MeshBasicMaterial({ map: bubbleTex, transparent: true, opacity: 0, toneMapped: false }));
-bubble.position.set(.1, 2.78, .3); bubble.visible = false; win.add(bubble);
+bubble.position.set(.15, 2.9, .3); bubble.visible = false; win.add(bubble);
 
 /* dark grid floor + dim particles */
 const grid = new THREE.GridHelper(70, 70, 0x1c1c25, 0x101016);
@@ -537,11 +547,13 @@ function frame() {
   win.rotation.x = mouse.y * .08;
 
   const pe = ease(peek);
-  buddy.visible = pe > .01;
-  buddy.position.y = lerp(1.1, 2.38, pe);
-  head.rotation.z = Math.sin(t * 2) * .05;
-  arm.rotation.z = -.55 + Math.sin(t * 9) * .4 * pe;
-  const eb = (t % 3.2) > 3.05 ? .1 : 1; eyes.forEach(m => { m.scale.y = eb; });
+  clawd.visible = pe > .01;
+  clawd.position.set(1.58, lerp(.8, 1.62, pe) + Math.sin(t * 2.4) * .025 * pe, -.42);
+  clawd.rotation.y = .2 + Math.sin(t * .8) * .07 * pe;
+  clawd.rotation.z = Math.sin(t * 1.6) * .02 * pe;
+  armL.rotation.z = -(.12 + Math.sin(t * 1.7) * .06 * pe);
+  armR.rotation.z = .12 + Math.sin(t * 1.7 + 1) * .06 * pe + pe * (2.05 + Math.sin(t * 8) * .32);
+  const eb = (t % 3.4) > 3.26 ? .08 : 1; eyeL.scale.y = eyeR.scale.y = eb;
   const ba = clamp((pe - .5) * 2); bubble.material.opacity = ba; bubble.scale.setScalar(.8 + .2 * ba); bubble.visible = ba > .01;
 
   if (frameN++ % 2 === 0) { drawScreen(demoP, t, termV, termP); tex.needsUpdate = true; }
