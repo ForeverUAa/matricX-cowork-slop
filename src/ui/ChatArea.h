@@ -69,6 +69,7 @@ private:
 
     QPushButton *m_uncollapseBtn = nullptr;
     QWidget *m_collapsedControls = nullptr;
+    bool m_sidebarCollapsed = false;
     QLabel *m_threadTitleLabel = nullptr;
     WindowControls *m_controls = nullptr;
 

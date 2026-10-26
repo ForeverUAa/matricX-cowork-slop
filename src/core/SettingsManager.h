@@ -40,6 +40,8 @@ public:
     void setRequireConfirmation(bool req);
 
     // Title-bar chrome configuration
+    QString windowControlsPlace() const;     // "titlebar" | "sidebar"
+    void setWindowControlsPlace(const QString &place);
     QString windowControlsPosition() const;  // "left" | "right"
     void setWindowControlsPosition(const QString &position);
     QString windowControlsShape() const;     // "circle" | "rounded" | "square"

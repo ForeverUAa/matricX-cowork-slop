@@ -301,24 +301,39 @@ void ChatArea::setCornerRadius(int radius) {
 }
 
 void ChatArea::setSidebarCollapsed(bool collapsed) {
+    m_sidebarCollapsed = collapsed;
     m_collapsedControls->setVisible(collapsed);
-    m_controls->setVisible(collapsed);
+
+    // The title-bar buttons live here permanently when the user picked the chat
+    // header; otherwise they only appear while the sidebar (and its buttons) is hidden.
+    const bool inTitleBar =
+        SettingsManager::instance().windowControlsPlace() == "titlebar";
+    m_controls->setVisible(collapsed || inTitleBar);
 }
 
 void ChatArea::applyWindowChrome() {
     const bool right = SettingsManager::instance().windowControlsPosition() == "right";
+    const bool inTitleBar =
+        SettingsManager::instance().windowControlsPlace() == "titlebar";
+    const bool showControls = inTitleBar || m_sidebarCollapsed;
 
     while (QLayoutItem *item = m_topBar->takeAt(0)) delete item;
 
     m_controls->applyPreferences();
 
-    if (!right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+    if (!inTitleBar) {
+        // Buttons belong to the sidebar; keep them out of this layout.
+        m_controls->hide();
+    }
+
+    if (showControls && !right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
     m_topBar->addWidget(m_collapsedControls, 0, Qt::AlignVCenter);
     m_topBar->addWidget(m_threadTitleLabel, 0, Qt::AlignVCenter);
     m_topBar->addWidget(m_statusPill, 0, Qt::AlignVCenter);
     m_topBar->addStretch();
-    if (right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+    if (showControls && right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
 
+    if (showControls) m_controls->show();
     m_topBar->invalidate();
 }
 

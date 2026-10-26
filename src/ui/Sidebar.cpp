@@ -169,6 +169,9 @@ void Sidebar::setCollapsed(bool collapsed) {
     m_scrollArea->setVisible(!m_collapsed);
     m_providerBadge->setVisible(!m_collapsed);
 
+    // A 54px rail cannot host the traffic lights; the chat header takes over.
+    applyWindowChrome();
+
     emit collapsedChanged(m_collapsed);
 }
 
@@ -179,17 +182,21 @@ void Sidebar::setCornerRadius(int radius) {
 
 void Sidebar::applyWindowChrome() {
     const bool right = SettingsManager::instance().windowControlsPosition() == "right";
+    const bool inTitleBar =
+        SettingsManager::instance().windowControlsPlace() == "titlebar";
+    const bool showControls = !inTitleBar && !m_collapsed;
 
     // Detach every item; widgets survive, spacer items are discarded.
     while (QLayoutItem *item = m_topBar->takeAt(0)) delete item;
 
     m_controls->applyPreferences();
+    m_controls->setVisible(showControls);
 
-    if (!right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+    if (showControls && !right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
     m_topBar->addStretch();
     m_topBar->addWidget(m_toggleBtn, 0, Qt::AlignVCenter);
     m_topBar->addWidget(m_newThreadBtn, 0, Qt::AlignVCenter);
-    if (right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+    if (showControls && right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
 
     m_topBar->invalidate();
 }

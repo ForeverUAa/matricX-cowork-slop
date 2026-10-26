@@ -27,7 +27,7 @@ namespace mcw {
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Settings");
     setModal(true);
-    setFixedSize(620, 640);
+    setFixedSize(640, 700);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
 
@@ -112,9 +112,27 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
 }
 
 void SettingsDialog::setupAppearanceTab(QWidget *tab) {
-    auto *layout = new QVBoxLayout(tab);
-    layout->setContentsMargins(20, 20, 20, 20);
-    layout->setSpacing(16);
+    auto *outer = new QVBoxLayout(tab);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->setSpacing(0);
+
+    // The dialog has a fixed size; scroll instead of squeezing rows into each other.
+    auto *scroll = new QScrollArea(tab);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setStyleSheet(
+        "QScrollArea { background: transparent; border: none; }"
+        "QScrollBar:vertical { background: transparent; width: 8px; margin: 2px; }"
+        "QScrollBar::handle:vertical { background: rgba(255, 255, 255, 0.22); border-radius: 4px; min-height: 30px; }"
+        "QScrollBar::handle:vertical:hover { background: rgba(255, 255, 255, 0.28); }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }");
+
+    auto *page = new QWidget;
+    page->setStyleSheet("background: transparent;");
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(20, 16, 20, 16);
+    layout->setSpacing(8);
 
     auto *themeLabel = new QLabel("Theme Mode");
     themeLabel->setStyleSheet("color: #e5e7eb; font-size: 14px; font-weight: 600;");
@@ -147,9 +165,10 @@ void SettingsDialog::setupAppearanceTab(QWidget *tab) {
 
     auto *themeHint = new QLabel("Appearance changes take effect instantly across all windows.");
     themeHint->setStyleSheet("color: #9ca3af; font-size: 12px;");
+    themeHint->setWordWrap(true);
     layout->addWidget(themeHint);
 
-    layout->addSpacing(12);
+    layout->addSpacing(6);
 
     // ---- Window controls ----
     auto *chromeLabel = new QLabel("Window Controls");
@@ -166,11 +185,25 @@ void SettingsDialog::setupAppearanceTab(QWidget *tab) {
         label->setStyleSheet("color: #d1d5db; font-size: 13px;");
         label->setFixedWidth(90);
         row->addWidget(label);
-        combo->setFixedHeight(34);
+        combo->setFixedHeight(30);
         combo->setStyleSheet(comboStyle);
         row->addWidget(combo, 1);
         layout->addLayout(row);
     };
+
+    m_controlsPlaceCombo = new QComboBox;
+    m_controlsPlaceCombo->addItem("Chat header", "titlebar");
+    m_controlsPlaceCombo->addItem("Sidebar", "sidebar");
+    m_controlsPlaceCombo->setCurrentIndex(
+        SettingsManager::instance().windowControlsPlace() == "sidebar" ? 1 : 0);
+    connect(m_controlsPlaceCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+        SettingsManager::instance().setWindowControlsPlace(
+            m_controlsPlaceCombo->itemData(idx).toString());
+        if (onWindowChromeChanged) onWindowChromeChanged();
+        m_statusLabel->setText(idx == 0 ? "Window buttons moved to the chat header."
+                                        : "Window buttons moved to the sidebar.");
+    });
+    addComboRow("Place", m_controlsPlaceCombo);
 
     m_controlsPositionCombo = new QComboBox;
     m_controlsPositionCombo->addItem("Right", "right");
@@ -213,11 +246,14 @@ void SettingsDialog::setupAppearanceTab(QWidget *tab) {
     });
     addComboRow("Size", m_controlsSizeCombo);
 
-    auto *chromeHint = new QLabel("Move the title-bar buttons and pick their shape and size.");
+    auto *chromeHint = new QLabel(
+        "Park the traffic-light buttons in the chat header (top-right) or the sidebar, "
+        "then choose their side, shape and size.");
     chromeHint->setStyleSheet("color: #9ca3af; font-size: 12px;");
+    chromeHint->setWordWrap(true);
     layout->addWidget(chromeHint);
 
-    layout->addSpacing(12);
+    layout->addSpacing(6);
 
     auto *thinkingLabel = new QLabel("Thinking & Reasoning");
     thinkingLabel->setStyleSheet("color: #e5e7eb; font-size: 14px; font-weight: 600;");
@@ -238,9 +274,10 @@ void SettingsDialog::setupAppearanceTab(QWidget *tab) {
 
     auto *reasoningHint = new QLabel("Shows the model's reasoning above the answer when the provider exposes it.");
     reasoningHint->setStyleSheet("color: #9ca3af; font-size: 12px;");
+    reasoningHint->setWordWrap(true);
     layout->addWidget(reasoningHint);
 
-    layout->addSpacing(12);
+    layout->addSpacing(6);
 
     auto *safetyLabel = new QLabel("Computer Control & Safety");
     safetyLabel->setStyleSheet("color: #e5e7eb; font-size: 14px; font-weight: 600;");
@@ -260,9 +297,13 @@ void SettingsDialog::setupAppearanceTab(QWidget *tab) {
 
     auto *safetyHint = new QLabel("When enabled, M-Cowork shows an Allow/Deny banner before each mouse or keyboard action.");
     safetyHint->setStyleSheet("color: #9ca3af; font-size: 12px;");
+    safetyHint->setWordWrap(true);
     layout->addWidget(safetyHint);
 
     layout->addStretch();
+
+    scroll->setWidget(page);
+    outer->addWidget(scroll);
 }
 
 void SettingsDialog::setupProvidersTab(QWidget *tab) {

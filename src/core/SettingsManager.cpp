@@ -149,6 +149,16 @@ void SettingsManager::setRequireConfirmation(bool req) {
     s.setValue("safety/requireConfirmation", req);
 }
 
+QString SettingsManager::windowControlsPlace() const {
+    QSettings s("MCowork", "MCowork");
+    return s.value("ui/windowControlsPlace", "titlebar").toString();
+}
+
+void SettingsManager::setWindowControlsPlace(const QString &place) {
+    QSettings s("MCowork", "MCowork");
+    s.setValue("ui/windowControlsPlace", place);
+}
+
 QString SettingsManager::windowControlsPosition() const {
     QSettings s("MCowork", "MCowork");
     return s.value("ui/windowControlsPosition", "right").toString();

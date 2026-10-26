@@ -43,6 +43,7 @@ private:
 
     // Appearance tab
     QComboBox *m_themeCombo = nullptr;
+    QComboBox *m_controlsPlaceCombo = nullptr;
     QComboBox *m_controlsPositionCombo = nullptr;
     QComboBox *m_controlsShapeCombo = nullptr;
     QComboBox *m_controlsSizeCombo = nullptr;
