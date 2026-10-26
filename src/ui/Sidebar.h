@@ -7,9 +7,12 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+class QHBoxLayout;
+
 namespace mcw {
 
 class WindowControls;
+
 
 // OpenAI Codex-style sidebar: collapsible, search filter, clean session list, user/settings footer.
 class Sidebar : public QWidget {
@@ -25,6 +28,9 @@ public:
     bool isCollapsed() const { return m_collapsed; }
     void setCollapsed(bool collapsed);
 
+    // Re-place the window buttons according to the user's chrome preference.
+    void applyWindowChrome();
+
 public slots:
     void refreshSessions();
 
@@ -39,6 +45,7 @@ private:
     int m_expandedWidth = 250;
 
     WindowControls *m_controls = nullptr;
+    QHBoxLayout *m_topBar = nullptr;
     QPushButton *m_toggleBtn = nullptr;
     QPushButton *m_newThreadBtn = nullptr;
     QLineEdit *m_searchEdit = nullptr;

@@ -34,17 +34,14 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     root->setSpacing(0);
 
     // Top Navigation & Window Controls Bar
-    auto *topBar = new QHBoxLayout;
-    topBar->setContentsMargins(16, 12, 16, 8);
-    topBar->setSpacing(12);
+    m_topBar = new QHBoxLayout;
+    m_topBar->setContentsMargins(16, 12, 16, 8);
+    m_topBar->setSpacing(12);
 
     m_collapsedControls = new QWidget(this);
     auto *cLayout = new QHBoxLayout(m_collapsedControls);
     cLayout->setContentsMargins(0, 0, 0, 0);
     cLayout->setSpacing(8);
-
-    m_controls = new WindowControls(m_collapsedControls);
-    cLayout->addWidget(m_controls, 0, Qt::AlignVCenter);
 
     m_uncollapseBtn = new QPushButton(m_collapsedControls);
     m_uncollapseBtn->setIcon(icons::icon(icons::IconType::PanelLeft, QColor(161, 161, 170)));
@@ -54,20 +51,18 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     m_uncollapseBtn->setStyleSheet("QPushButton { background: transparent; border: none; border-radius: 6px; } QPushButton:hover { background: rgba(255,255,255,0.08); }");
     cLayout->addWidget(m_uncollapseBtn, 0, Qt::AlignVCenter);
 
-    m_collapsedControls->hide();
-    topBar->addWidget(m_collapsedControls);
+    m_controls = new WindowControls(this);
+    m_controls->hide();
 
     m_threadTitleLabel = new QLabel(this);
     m_threadTitleLabel->setStyleSheet("color: #f4f4f5; font-size: 14px; font-weight: 600;");
-    topBar->addWidget(m_threadTitleLabel);
 
     m_statusPill = new QLabel(this);
     m_statusPill->setFixedHeight(24);
     m_statusPill->hide();
-    topBar->addWidget(m_statusPill);
 
-    topBar->addStretch();
-    root->addLayout(topBar);
+    applyWindowChrome();
+    root->addLayout(m_topBar);
 
     // Center Message Stream (Codex centered column with max width 780px)
     m_scroll = new QScrollArea(this);
@@ -241,6 +236,7 @@ ChatArea::ChatArea(QWidget *parent) : QWidget(parent) {
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this] { update(); });
 
     updateSendButtonState();
+    setSidebarCollapsed(false);
     loadCurrentSession();
 }
 
@@ -306,6 +302,24 @@ void ChatArea::setCornerRadius(int radius) {
 
 void ChatArea::setSidebarCollapsed(bool collapsed) {
     m_collapsedControls->setVisible(collapsed);
+    m_controls->setVisible(collapsed);
+}
+
+void ChatArea::applyWindowChrome() {
+    const bool right = SettingsManager::instance().windowControlsPosition() == "right";
+
+    while (QLayoutItem *item = m_topBar->takeAt(0)) delete item;
+
+    m_controls->applyPreferences();
+
+    if (!right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+    m_topBar->addWidget(m_collapsedControls, 0, Qt::AlignVCenter);
+    m_topBar->addWidget(m_threadTitleLabel, 0, Qt::AlignVCenter);
+    m_topBar->addWidget(m_statusPill, 0, Qt::AlignVCenter);
+    m_topBar->addStretch();
+    if (right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+
+    m_topBar->invalidate();
 }
 
 void ChatArea::updateStatusIndicator(const QString &text, bool active) {
@@ -344,11 +358,23 @@ void ChatArea::updateSendButtonState() {
 }
 
 void ChatArea::loadCurrentSession() {
-    // Clear displayed message widgets (except empty state and trailing stretch)
+    // Clear displayed message widgets (except empty state and trailing stretch).
+    // Items may be either widgets (action cards, message rows) or bare sub-layouts;
+    // deleting a sub-layout alone leaves its child widgets alive and visible, so
+    // destroy those widgets explicitly before dropping the layout.
     while (m_msgLayout->count() > 2) {
         QLayoutItem *item = m_msgLayout->takeAt(1);
-        if (item->widget()) delete item->widget();
-        delete item;
+        if (!item) break;
+        if (QLayout *sub = item->layout()) {
+            while (QLayoutItem *child = sub->takeAt(0)) {
+                delete child->widget();
+                delete child;
+            }
+            delete sub;  // `sub` is the same object as `item`
+        } else {
+            delete item->widget();
+            delete item;
+        }
     }
 
     const auto s = SessionManager::instance().currentSession();
@@ -359,8 +385,22 @@ void ChatArea::loadCurrentSession() {
     m_threadTitleLabel->setText(s.title.isEmpty() ? "New Chat" : s.title);
 
     for (const auto &msg : s.messages) {
+        if (msg.role == "thinking") {
+            // Persisted reasoning: render read-only, never feed it back to the model.
+            QLabel *body = nullptr;
+            QLabel *detail = nullptr;
+            m_msgLayout->insertWidget(m_msgLayout->count() - 1,
+                                       buildThinkingRow(msg.content, false, &body, &detail));
+            continue;
+        }
         addMessage(msg.content, msg.role == "user");
         m_history.append({msg.role, msg.content});
+    }
+
+    // A rebuild destroys the live thinking bubble; restore it while a run is active.
+    if (m_busy) {
+        m_thinkingRow = nullptr;
+        showThinkingBubble(m_thinkingDetailText.isEmpty() ? "Thinking" : m_thinkingDetailText);
     }
 
     if (!s.provider.isEmpty() && !s.model.isEmpty()) {
@@ -390,13 +430,18 @@ void ChatArea::paintEvent(QPaintEvent *) {
 void ChatArea::addMessage(const QString &text, bool fromUser) {
     const bool dark = ThemeManager::instance().isDark();
 
-    auto *row = new QHBoxLayout;
+    // Each row lives in its own container widget so loadCurrentSession() can delete
+    // it as a whole. A bare QHBoxLayout has no widget() to delete, which used to
+    // orphan the bubbles and leave them floating over the canvas.
+    auto *rowWidget = new QWidget(this);
+    rowWidget->setStyleSheet("background: transparent;");
+    auto *row = new QHBoxLayout(rowWidget);
     row->setContentsMargins(0, 0, 0, 0);
     row->setSpacing(10);
 
     if (fromUser) {
         row->addStretch();
-        auto *bubble = new QLabel(text, this);
+        auto *bubble = new QLabel(text, rowWidget);
         bubble->setWordWrap(true);
         bubble->setMaximumWidth(540);
         bubble->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -405,7 +450,7 @@ void ChatArea::addMessage(const QString &text, bool fromUser) {
             "border-radius: 14px; padding: 10px 16px; font-size: 14px; line-height: 1.45;");
         row->addWidget(bubble);
     } else {
-        auto *card = new QFrame(this);
+        auto *card = new QFrame(rowWidget);
         card->setObjectName("assistantCard");
         card->setStyleSheet(
             "QFrame#assistantCard { background: transparent; border: none; }");
@@ -440,7 +485,7 @@ void ChatArea::addMessage(const QString &text, bool fromUser) {
         row->addWidget(card, 1);
     }
 
-    m_msgLayout->insertLayout(m_msgLayout->count() - 1, row);
+    m_msgLayout->insertWidget(m_msgLayout->count() - 1, rowWidget);
     QTimer::singleShot(10, this, [this] {
         m_scroll->verticalScrollBar()->setValue(m_scroll->verticalScrollBar()->maximum());
     });
@@ -453,6 +498,125 @@ void ChatArea::addActionCard(const QString &toolName, const QJsonObject &args) {
     QTimer::singleShot(10, this, [this] {
         m_scroll->verticalScrollBar()->setValue(m_scroll->verticalScrollBar()->maximum());
     });
+}
+
+// Builds the assistant-style "thinking" bubble. When `live`, the caller drives the
+// body/detail labels through show/updateThinkingBubble(); otherwise it is a static,
+// persisted reasoning card shown after the fact.
+QWidget *ChatArea::buildThinkingRow(const QString &text, bool live,
+                                    QLabel **bodyOut, QLabel **detailOut) {
+    const bool dark = ThemeManager::instance().isDark();
+
+    auto *rowWidget = new QWidget(this);
+    rowWidget->setStyleSheet("background: transparent;");
+    auto *row = new QHBoxLayout(rowWidget);
+    row->setContentsMargins(0, 0, 0, 0);
+    row->setSpacing(10);
+
+    auto *card = new QFrame(rowWidget);
+    card->setObjectName("thinkCard");
+    card->setStyleSheet(dark
+        ? "QFrame#thinkCard { background: #1b1b1f; border: 1px solid #2e2e33; border-radius: 14px; }"
+        : "QFrame#thinkCard { background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 14px; }");
+
+    auto *cardLayout = new QVBoxLayout(card);
+    cardLayout->setContentsMargins(14, 10, 14, 12);
+    cardLayout->setSpacing(6);
+
+    auto *hdr = new QHBoxLayout;
+    hdr->setSpacing(6);
+    auto *botIcon = new QLabel(card);
+    botIcon->setPixmap(icons::pixmap(icons::IconType::Bot, QSize(15, 15), QColor(16, 185, 129)));
+    hdr->addWidget(botIcon);
+    auto *name = new QLabel(live ? "M-Cowork is thinking" : "M-Cowork's thoughts", card);
+    name->setStyleSheet(dark ? "font-size: 12px; font-weight: 600; color: #a1a1aa;"
+                             : "font-size: 12px; font-weight: 600; color: #52525b;");
+    hdr->addWidget(name);
+    hdr->addStretch();
+    cardLayout->addLayout(hdr);
+
+    auto *body = new QLabel(card);
+    body->setWordWrap(true);
+    body->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    body->setText(text);
+    body->setStyleSheet(dark ? (live ? "color: #e4e4e7; font-size: 13px; font-style: italic;"
+                                     : "color: #d4d4d8; font-size: 13px; font-style: italic; line-height: 1.45;")
+                             : "color: #3f3f46; font-size: 13px; font-style: italic; line-height: 1.45;");
+    cardLayout->addWidget(body);
+
+    auto *detail = new QLabel(card);
+    detail->setWordWrap(true);
+    detail->setStyleSheet(dark ? "color: #71717a; font-size: 12px;" : "color: #71717a; font-size: 12px;");
+    detail->setVisible(live);
+    cardLayout->addWidget(detail);
+
+    row->addWidget(card, 1);
+
+    if (bodyOut) *bodyOut = body;
+    if (detailOut) *detailOut = detail;
+    return rowWidget;
+}
+
+void ChatArea::showThinkingBubble(const QString &detail) {
+    if (!m_thinkingRow) {
+        m_thinkingDots = 0;
+        m_thinkingClock.start();
+
+        QLabel *body = nullptr;
+        QLabel *detailLbl = nullptr;
+        QWidget *row = buildThinkingRow(QString(), true, &body, &detailLbl);
+        m_thinkingBody = body;
+        m_thinkingDetail = detailLbl;
+        m_msgLayout->insertWidget(m_msgLayout->count() - 1, row);
+        m_thinkingRow = row;
+
+        if (!m_thinkingTick) {
+            m_thinkingTick = new QTimer(this);
+            m_thinkingTick->setInterval(400);
+            connect(m_thinkingTick, &QTimer::timeout, this, [this] {
+                if (!m_thinkingRow) {
+                    m_thinkingTick->stop();
+                    return;
+                }
+                m_thinkingDots = (m_thinkingDots + 1) % 4;
+                if (m_thinkingBody) {
+                    m_thinkingBody->setText(QString("Thinking%1").arg(QString(m_thinkingDots, '.')));
+                }
+                if (m_thinkingDetail) {
+                    const qint64 secs = m_thinkingClock.elapsed() / 1000;
+                    m_thinkingDetail->setText(secs >= 1
+                        ? QString("%1  ·  %2s").arg(m_thinkingDetailText).arg(secs)
+                        : m_thinkingDetailText);
+                }
+            });
+        }
+        m_thinkingTick->start();
+    }
+
+    updateThinkingBubble(detail);
+
+    QTimer::singleShot(10, this, [this] {
+        m_scroll->verticalScrollBar()->setValue(m_scroll->verticalScrollBar()->maximum());
+    });
+}
+
+void ChatArea::updateThinkingBubble(const QString &detail) {
+    if (!detail.isEmpty()) m_thinkingDetailText = detail;
+    if (m_thinkingBody) {
+        m_thinkingBody->setText(QString("Thinking%1").arg(QString(m_thinkingDots, '.')));
+    }
+    if (m_thinkingDetail) m_thinkingDetail->setText(m_thinkingDetailText);
+}
+
+void ChatArea::removeThinkingBubble() {
+    if (m_thinkingTick) m_thinkingTick->stop();
+    if (m_thinkingRow) {
+        m_thinkingRow->deleteLater();
+        m_thinkingRow = nullptr;
+    }
+    m_thinkingBody = nullptr;
+    m_thinkingDetail = nullptr;
+    m_thinkingDetailText.clear();
 }
 
 void ChatArea::addErrorMessage(const QString &errorMessage) {
@@ -631,7 +795,8 @@ void ChatArea::runAgentLoop() {
     m_busy = true;
     m_input->setEnabled(false);
     updateSendButtonState();
-    updateStatusIndicator("Thinking...", false);
+    updateStatusIndicator(QString(), false);
+    showThinkingBubble("Waiting for the model");
 
     QJsonArray tools = m_tool.definitions();
     const QString currentSid = SessionManager::instance().currentSessionId();
@@ -643,8 +808,14 @@ void ChatArea::runAgentLoop() {
             m_input->setFocus();
             updateSendButtonState();
             updateStatusIndicator(QString(), false);
+            removeThinkingBubble();
             addErrorMessage(resp.errorMessage);
             return;
+        }
+
+        // Persist any provider-supplied reasoning so it stays visible in the transcript.
+        if (!resp.reasoning.trimmed().isEmpty() && SettingsManager::instance().showReasoning()) {
+            SessionManager::instance().appendMessage(currentSid, "thinking", resp.reasoning.trimmed());
         }
 
         if (!resp.text.isEmpty()) {
@@ -658,6 +829,7 @@ void ChatArea::runAgentLoop() {
             m_input->setFocus();
             updateSendButtonState();
             updateStatusIndicator(QString(), false);
+            removeThinkingBubble();
             return;
         }
 
@@ -672,7 +844,8 @@ void ChatArea::executeNextToolCall(const QList<ToolCallRequest> &calls, int inde
     }
 
     const auto &tc = calls[index];
-    updateStatusIndicator(QString("Executing: %1").arg(tc.name), true);
+    updateStatusIndicator(QString(), false);
+    updateThinkingBubble(QString("Running %1").arg(tc.name));
 
     addActionCard(tc.name, tc.arguments);
 

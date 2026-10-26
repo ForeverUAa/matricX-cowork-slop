@@ -39,6 +39,18 @@ public:
     bool requireConfirmation() const;
     void setRequireConfirmation(bool req);
 
+    // Title-bar chrome configuration
+    QString windowControlsPosition() const;  // "left" | "right"
+    void setWindowControlsPosition(const QString &position);
+    QString windowControlsShape() const;     // "circle" | "rounded" | "square"
+    void setWindowControlsShape(const QString &shape);
+    QString windowControlsSize() const;      // "small" | "medium" | "large"
+    void setWindowControlsSize(const QString &size);
+
+    // Show the model's reasoning inside a thinking bubble
+    bool showReasoning() const;
+    void setShowReasoning(bool show);
+
 private:
     SettingsManager();
 };

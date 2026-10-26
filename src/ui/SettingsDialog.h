@@ -6,6 +6,7 @@
 #include "ai/AiClient.h"
 
 class QComboBox;
+class QCheckBox;
 class QLineEdit;
 class QLabel;
 class QPushButton;
@@ -21,6 +22,8 @@ public:
     explicit SettingsDialog(QWidget *parent = nullptr);
 
     std::function<void()> onSettingsSaved;
+    // Fired live when the window-chrome preferences change, so the frame can re-layout.
+    std::function<void()> onWindowChromeChanged;
 
 protected:
     void paintEvent(QPaintEvent *) override;
@@ -40,6 +43,10 @@ private:
 
     // Appearance tab
     QComboBox *m_themeCombo = nullptr;
+    QComboBox *m_controlsPositionCombo = nullptr;
+    QComboBox *m_controlsShapeCombo = nullptr;
+    QComboBox *m_controlsSizeCombo = nullptr;
+    QCheckBox *m_showReasoningCheck = nullptr;
 
     // Providers tab
     QVBoxLayout *m_providerCardsLayout = nullptr;

@@ -84,6 +84,17 @@ void AiClient::sendGemini(const QList<ChatMessage> &history,
     }
     innerReq["contents"] = contents;
 
+    // Ask Gemini for readable thought summaries (2.5+ thinking models only; older
+    // models reject thinkingConfig and would fail the whole request). The Cloud Code /
+    // Antigravity envelope does not accept thinkingConfig, so OAuth requests skip it.
+    if (!useOAuth && (model.contains("2.5") || model.contains("3."))) {
+        QJsonObject thinking;
+        thinking["includeThoughts"] = true;
+        QJsonObject genCfg;
+        genCfg["thinkingConfig"] = thinking;
+        innerReq["generationConfig"] = genCfg;
+    }
+
     // Add tools (functionDeclarations)
     if (!toolDefinitions.isEmpty()) {
         QJsonArray funcs;
@@ -108,6 +119,8 @@ void AiClient::sendGemini(const QList<ChatMessage> &history,
     QByteArray postData;
     QNetworkRequest request;
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    // Never let a stalled provider spin the UI forever.
+    request.setTransferTimeout(120000);
 
     if (useOAuth) {
         // Google Cloud Code / Antigravity internal endpoint
@@ -174,8 +187,14 @@ void AiClient::sendGemini(const QList<ChatMessage> &history,
         for (const auto &pVal : parts) {
             const auto pObj = pVal.toObject();
             if (pObj.contains("text")) {
-                if (!resp.text.isEmpty()) resp.text += "\n";
-                resp.text += pObj.value("text").toString();
+                const QString piece = pObj.value("text").toString();
+                if (pObj.value("thought").toBool(false)) {
+                    if (!resp.reasoning.isEmpty()) resp.reasoning += "\n";
+                    resp.reasoning += piece;
+                } else {
+                    if (!resp.text.isEmpty()) resp.text += "\n";
+                    resp.text += piece;
+                }
             }
             if (pObj.contains("functionCall")) {
                 const auto fc = pObj.value("functionCall").toObject();
@@ -262,6 +281,7 @@ void AiClient::sendOpenAiCompatible(const QList<ChatMessage> &history,
 
     QNetworkRequest request{QUrl(urlStr)};
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setTransferTimeout(120000);
     if (!apiKey.isEmpty()) {
         request.setRawHeader("Authorization", "Bearer " + apiKey.toUtf8());
     }
@@ -296,6 +316,9 @@ void AiClient::sendOpenAiCompatible(const QList<ChatMessage> &history,
         AiResponse resp;
         resp.success = true;
         resp.text = msg.value("content").toString();
+        // DeepSeek exposes reasoning_content; OpenRouter uses reasoning.
+        resp.reasoning = msg.value("reasoning_content").toString();
+        if (resp.reasoning.isEmpty()) resp.reasoning = msg.value("reasoning").toString();
 
         const auto toolCallsArr = msg.value("tool_calls").toArray();
         for (const auto &tcVal : toolCallsArr) {
@@ -383,6 +406,7 @@ void AiClient::sendAnthropic(const QList<ChatMessage> &history,
 
     QNetworkRequest request{QUrl(urlStr)};
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setTransferTimeout(120000);
     request.setRawHeader("x-api-key", apiKey.toUtf8());
     request.setRawHeader("anthropic-version", "2023-06-01");
 
@@ -415,6 +439,9 @@ void AiClient::sendAnthropic(const QList<ChatMessage> &history,
             if (type == "text") {
                 if (!resp.text.isEmpty()) resp.text += "\n";
                 resp.text += cObj.value("text").toString();
+            } else if (type == "thinking") {
+                if (!resp.reasoning.isEmpty()) resp.reasoning += "\n";
+                resp.reasoning += cObj.value("thinking").toString();
             } else if (type == "tool_use") {
                 ToolCallRequest tcr;
                 tcr.id = cObj.value("id").toString();

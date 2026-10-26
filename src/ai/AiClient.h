@@ -29,6 +29,7 @@ struct AiResponse {
     QString text;
     QList<ToolCallRequest> toolCalls;
     QString errorMessage;
+    QString reasoning;  // Provider-supplied "thinking" text, when available
 };
 
 class AiClient {

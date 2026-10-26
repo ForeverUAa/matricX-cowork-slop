@@ -2,6 +2,7 @@
 
 #include <QEasingCurve>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPolygonF>
 
 namespace mcw {
@@ -14,6 +15,19 @@ CircleButton::CircleButton(Kind kind, const QColor &color, QWidget *parent)
     m_anim = new QPropertyAnimation(this, "hoverProgress", this);
     m_anim->setDuration(160);
     m_anim->setEasingCurve(QEasingCurve::OutCubic);
+}
+
+void CircleButton::setShape(Shape shape) {
+    if (m_shape == shape) return;
+    m_shape = shape;
+    update();
+}
+
+void CircleButton::setButtonSize(int px) {
+    if (width() == px) return;
+    setFixedSize(px, px);
+    updateGeometry();
+    update();
 }
 
 void CircleButton::setHoverProgress(float val) {
@@ -38,7 +52,20 @@ void CircleButton::paintEvent(QPaintEvent *) {
     QColor fill = isDown() ? m_color.darker(120) : m_color;
     p.setPen(QPen(fill.darker(130), 0.75));
     p.setBrush(fill);
-    p.drawEllipse(rect().adjusted(1, 1, -1, -1));
+
+    const QRectF body = QRectF(rect()).adjusted(1, 1, -1, -1);
+    switch (m_shape) {
+    case RoundedSquare:
+        p.drawRoundedRect(body, body.width() * 0.28, body.height() * 0.28);
+        break;
+    case Square:
+        p.drawRect(body);
+        break;
+    case Circle:
+    default:
+        p.drawEllipse(body);
+        break;
+    }
 
     if (m_hoverProgress <= 0.01f) return;
 

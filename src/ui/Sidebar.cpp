@@ -28,15 +28,12 @@ Sidebar::Sidebar(QWidget *parent) : QWidget(parent) {
     root->setContentsMargins(12, 14, 12, 12);
     root->setSpacing(10);
 
-    // Header bar: macOS Traffic Lights on the left, Toggle & New Chat on the right
-    auto *topBar = new QHBoxLayout;
-    topBar->setContentsMargins(0, 0, 0, 0);
-    topBar->setSpacing(6);
+    // Header bar: window buttons (left or right, per user preference), Toggle & New Chat
+    m_topBar = new QHBoxLayout;
+    m_topBar->setContentsMargins(0, 0, 0, 0);
+    m_topBar->setSpacing(6);
 
     m_controls = new WindowControls(this);
-    topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
-
-    topBar->addStretch();
 
     m_toggleBtn = new QPushButton(this);
     m_toggleBtn->setIcon(icons::icon(icons::IconType::PanelLeft, QColor(161, 161, 170)));
@@ -49,7 +46,6 @@ Sidebar::Sidebar(QWidget *parent) : QWidget(parent) {
     connect(m_toggleBtn, &QPushButton::clicked, this, [this] {
         setCollapsed(!m_collapsed);
     });
-    topBar->addWidget(m_toggleBtn);
 
     m_newThreadBtn = new QPushButton(this);
     m_newThreadBtn->setIcon(icons::icon(icons::IconType::Plus, QColor(244, 244, 245)));
@@ -62,9 +58,10 @@ Sidebar::Sidebar(QWidget *parent) : QWidget(parent) {
     connect(m_newThreadBtn, &QPushButton::clicked, this, [] {
         SessionManager::instance().createSession("New Chat");
     });
-    topBar->addWidget(m_newThreadBtn);
 
-    root->addLayout(topBar);
+    applyWindowChrome();
+
+    root->addLayout(m_topBar);
 
     // Search bar
     m_searchEdit = new QLineEdit(this);
@@ -178,6 +175,23 @@ void Sidebar::setCollapsed(bool collapsed) {
 void Sidebar::setCornerRadius(int radius) {
     m_radius = radius;
     updateTheme();
+}
+
+void Sidebar::applyWindowChrome() {
+    const bool right = SettingsManager::instance().windowControlsPosition() == "right";
+
+    // Detach every item; widgets survive, spacer items are discarded.
+    while (QLayoutItem *item = m_topBar->takeAt(0)) delete item;
+
+    m_controls->applyPreferences();
+
+    if (!right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+    m_topBar->addStretch();
+    m_topBar->addWidget(m_toggleBtn, 0, Qt::AlignVCenter);
+    m_topBar->addWidget(m_newThreadBtn, 0, Qt::AlignVCenter);
+    if (right) m_topBar->addWidget(m_controls, 0, Qt::AlignVCenter);
+
+    m_topBar->invalidate();
 }
 
 void Sidebar::updateTheme() {

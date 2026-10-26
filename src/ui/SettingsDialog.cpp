@@ -151,6 +151,97 @@ void SettingsDialog::setupAppearanceTab(QWidget *tab) {
 
     layout->addSpacing(12);
 
+    // ---- Window controls ----
+    auto *chromeLabel = new QLabel("Window Controls");
+    chromeLabel->setStyleSheet("color: #e5e7eb; font-size: 14px; font-weight: 600;");
+    layout->addWidget(chromeLabel);
+
+    const QString comboStyle =
+        "QComboBox { background: #28282e; border: 1px solid #3f3f46; border-radius: 6px; color: #f3f4f6; padding: 4px 12px; font-size: 13px; }"
+        "QComboBox QAbstractItemView { background: #28282e; color: #f3f4f6; selection-background-color: #10b981; }";
+
+    auto addComboRow = [&](const QString &caption, QComboBox *combo) {
+        auto *row = new QHBoxLayout;
+        auto *label = new QLabel(caption);
+        label->setStyleSheet("color: #d1d5db; font-size: 13px;");
+        label->setFixedWidth(90);
+        row->addWidget(label);
+        combo->setFixedHeight(34);
+        combo->setStyleSheet(comboStyle);
+        row->addWidget(combo, 1);
+        layout->addLayout(row);
+    };
+
+    m_controlsPositionCombo = new QComboBox;
+    m_controlsPositionCombo->addItem("Right", "right");
+    m_controlsPositionCombo->addItem("Left", "left");
+    m_controlsPositionCombo->setCurrentIndex(
+        SettingsManager::instance().windowControlsPosition() == "left" ? 1 : 0);
+    connect(m_controlsPositionCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+        SettingsManager::instance().setWindowControlsPosition(
+            m_controlsPositionCombo->itemData(idx).toString());
+        if (onWindowChromeChanged) onWindowChromeChanged();
+        m_statusLabel->setText("Window controls moved.");
+    });
+    addComboRow("Position", m_controlsPositionCombo);
+
+    m_controlsShapeCombo = new QComboBox;
+    m_controlsShapeCombo->addItem("Circle", "circle");
+    m_controlsShapeCombo->addItem("Rounded square", "rounded");
+    m_controlsShapeCombo->addItem("Square", "square");
+    const QString shape = SettingsManager::instance().windowControlsShape();
+    m_controlsShapeCombo->setCurrentIndex(shape == "rounded" ? 1 : (shape == "square" ? 2 : 0));
+    connect(m_controlsShapeCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+        SettingsManager::instance().setWindowControlsShape(
+            m_controlsShapeCombo->itemData(idx).toString());
+        if (onWindowChromeChanged) onWindowChromeChanged();
+        m_statusLabel->setText("Window control shape updated.");
+    });
+    addComboRow("Shape", m_controlsShapeCombo);
+
+    m_controlsSizeCombo = new QComboBox;
+    m_controlsSizeCombo->addItem("Small", "small");
+    m_controlsSizeCombo->addItem("Medium", "medium");
+    m_controlsSizeCombo->addItem("Large", "large");
+    const QString size = SettingsManager::instance().windowControlsSize();
+    m_controlsSizeCombo->setCurrentIndex(size == "small" ? 0 : (size == "large" ? 2 : 1));
+    connect(m_controlsSizeCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+        SettingsManager::instance().setWindowControlsSize(
+            m_controlsSizeCombo->itemData(idx).toString());
+        if (onWindowChromeChanged) onWindowChromeChanged();
+        m_statusLabel->setText("Window control size updated.");
+    });
+    addComboRow("Size", m_controlsSizeCombo);
+
+    auto *chromeHint = new QLabel("Move the title-bar buttons and pick their shape and size.");
+    chromeHint->setStyleSheet("color: #9ca3af; font-size: 12px;");
+    layout->addWidget(chromeHint);
+
+    layout->addSpacing(12);
+
+    auto *thinkingLabel = new QLabel("Thinking & Reasoning");
+    thinkingLabel->setStyleSheet("color: #e5e7eb; font-size: 14px; font-weight: 600;");
+    layout->addWidget(thinkingLabel);
+
+    m_showReasoningCheck = new QCheckBox("Show the model's thinking in a bubble");
+    m_showReasoningCheck->setChecked(SettingsManager::instance().showReasoning());
+    m_showReasoningCheck->setCursor(Qt::PointingHandCursor);
+    m_showReasoningCheck->setStyleSheet(
+        "QCheckBox { color: #d1d5db; font-size: 13px; }"
+        "QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid #52525b; border-radius: 4px; background: #27272a; }"
+        "QCheckBox::indicator:checked { background: #10b981; border-color: #10b981; }");
+    connect(m_showReasoningCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        SettingsManager::instance().setShowReasoning(checked);
+        m_statusLabel->setText(checked ? "Thinking bubbles enabled." : "Thinking bubbles hidden.");
+    });
+    layout->addWidget(m_showReasoningCheck);
+
+    auto *reasoningHint = new QLabel("Shows the model's reasoning above the answer when the provider exposes it.");
+    reasoningHint->setStyleSheet("color: #9ca3af; font-size: 12px;");
+    layout->addWidget(reasoningHint);
+
+    layout->addSpacing(12);
+
     auto *safetyLabel = new QLabel("Computer Control & Safety");
     safetyLabel->setStyleSheet("color: #e5e7eb; font-size: 14px; font-weight: 600;");
     layout->addWidget(safetyLabel);

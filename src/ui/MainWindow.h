@@ -29,6 +29,7 @@ protected:
 private:
     void updateCorners();
     void toggleMaximize();  // manual maximize: native WS_MAXIMIZE breaks translucent windows
+    void applyWindowChrome();
 
     Sidebar *m_sidebar = nullptr;
     ChatArea *m_chat = nullptr;

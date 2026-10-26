@@ -68,10 +68,18 @@ MainWindow::MainWindow() {
 
     connect(m_sidebar->settingsButton(), &QAbstractButton::clicked, this, [this] {
         SettingsDialog dlg(this);
+        dlg.onWindowChromeChanged = [this] { applyWindowChrome(); };
         dlg.exec();
+        // Preferences may have changed while the dialog was open.
+        applyWindowChrome();
     });
 
     updateCorners();
+}
+
+void MainWindow::applyWindowChrome() {
+    if (m_sidebar) m_sidebar->applyWindowChrome();
+    if (m_chat) m_chat->applyWindowChrome();
 }
 
 void MainWindow::focusInput() { m_chat->focusInput(); }

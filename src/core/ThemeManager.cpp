@@ -119,7 +119,6 @@ void ThemeManager::updateEffectiveTheme() {
 }
 
 QString ThemeManager::qssVariables() const {
-    const auto &c = m_colors;
     return QString(
         "/* MCowork Theme Tokens */\n"
         "QWidget { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }\n"

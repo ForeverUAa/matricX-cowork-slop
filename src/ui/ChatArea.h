@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QList>
+#include <QPointer>
 #include <QPushButton>
 #include <QString>
 #include <QTimer>
@@ -13,7 +15,9 @@
 
 class QLineEdit;
 class QScrollArea;
+class QBoxLayout;
 class QVBoxLayout;
+class QHBoxLayout;
 class QLabel;
 class QFrame;
 
@@ -36,6 +40,9 @@ public:
     void focusInput();
     void setCornerRadius(int radius);
 
+    // Re-place the window buttons according to the user's chrome preference.
+    void applyWindowChrome();
+
 public slots:
     void loadCurrentSession();
     void setSidebarCollapsed(bool collapsed);
@@ -54,6 +61,12 @@ private:
     void runAgentLoop();
     void executeNextToolCall(const QList<ToolCallRequest> &calls, int index);
 
+    // Thinking bubble
+    void showThinkingBubble(const QString &detail);
+    void updateThinkingBubble(const QString &detail);
+    void removeThinkingBubble();
+    QWidget *buildThinkingRow(const QString &text, bool live, QLabel **bodyOut, QLabel **detailOut);
+
     QPushButton *m_uncollapseBtn = nullptr;
     QWidget *m_collapsedControls = nullptr;
     QLabel *m_threadTitleLabel = nullptr;
@@ -64,6 +77,16 @@ private:
     QVBoxLayout *m_msgLayout = nullptr;
     QWidget *m_emptyStateWidget = nullptr;
     DotMatrixWordmark *m_wordmark = nullptr;
+    QHBoxLayout *m_topBar = nullptr;
+
+    // Live "thinking" bubble (not persisted; disappears when the run finishes)
+    QPointer<QWidget> m_thinkingRow;
+    QLabel *m_thinkingBody = nullptr;
+    QLabel *m_thinkingDetail = nullptr;
+    QTimer *m_thinkingTick = nullptr;
+    QElapsedTimer m_thinkingClock;
+    QString m_thinkingDetailText;
+    int m_thinkingDots = 0;
 
     // Floating input capsule
     QFrame *m_capsule = nullptr;

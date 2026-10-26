@@ -33,7 +33,7 @@ const QList<ProviderConfig> &SettingsManager::availableProviders() {
             "openrouter",
             "OpenRouter",
             "https://openrouter.ai/api/v1",
-            {"deepseek/deepseek-chat", "deepseek/deepseek-r1", "anthropic/claude-3.7-sonnet", "google/gemini-2.5-flash", "openai/gpt-4o"},
+            {"openrouter/free", "deepseek/deepseek-chat", "deepseek/deepseek-r1", "anthropic/claude-3.7-sonnet", "google/gemini-2.5-flash", "openai/gpt-4o"},
             "deepseek/deepseek-chat",
             "https://openrouter.ai/keys"
         },
@@ -147,6 +147,46 @@ bool SettingsManager::requireConfirmation() const {
 void SettingsManager::setRequireConfirmation(bool req) {
     QSettings s("MCowork", "MCowork");
     s.setValue("safety/requireConfirmation", req);
+}
+
+QString SettingsManager::windowControlsPosition() const {
+    QSettings s("MCowork", "MCowork");
+    return s.value("ui/windowControlsPosition", "right").toString();
+}
+
+void SettingsManager::setWindowControlsPosition(const QString &position) {
+    QSettings s("MCowork", "MCowork");
+    s.setValue("ui/windowControlsPosition", position);
+}
+
+QString SettingsManager::windowControlsShape() const {
+    QSettings s("MCowork", "MCowork");
+    return s.value("ui/windowControlsShape", "circle").toString();
+}
+
+void SettingsManager::setWindowControlsShape(const QString &shape) {
+    QSettings s("MCowork", "MCowork");
+    s.setValue("ui/windowControlsShape", shape);
+}
+
+QString SettingsManager::windowControlsSize() const {
+    QSettings s("MCowork", "MCowork");
+    return s.value("ui/windowControlsSize", "medium").toString();
+}
+
+void SettingsManager::setWindowControlsSize(const QString &size) {
+    QSettings s("MCowork", "MCowork");
+    s.setValue("ui/windowControlsSize", size);
+}
+
+bool SettingsManager::showReasoning() const {
+    QSettings s("MCowork", "MCowork");
+    return s.value("ui/showReasoning", true).toBool();
+}
+
+void SettingsManager::setShowReasoning(bool show) {
+    QSettings s("MCowork", "MCowork");
+    s.setValue("ui/showReasoning", show);
 }
 
 }  // namespace mcw
