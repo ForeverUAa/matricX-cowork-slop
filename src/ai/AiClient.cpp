@@ -496,6 +496,7 @@ void AiClient::fetchAvailableModels(const QString &providerId, ModelsCallback ca
 
         const QString url = QString("%1/v1beta/models?key=%2").arg(baseUrl, token);
         QNetworkRequest req{QUrl(url)};
+        req.setTransferTimeout(120000);
         QNetworkReply *reply = m_nam->get(req);
         QObject::connect(reply, &QNetworkReply::finished, [reply, callback]() {
             reply->deleteLater();
@@ -522,6 +523,7 @@ void AiClient::fetchAvailableModels(const QString &providerId, ModelsCallback ca
             return;
         }
         QNetworkRequest req{QUrl(baseUrl + "/models")};
+        req.setTransferTimeout(120000);
         req.setRawHeader("x-api-key", apiKey.toUtf8());
         req.setRawHeader("anthropic-version", "2023-06-01");
         QNetworkReply *reply = m_nam->get(req);
@@ -549,6 +551,7 @@ void AiClient::fetchAvailableModels(const QString &providerId, ModelsCallback ca
     }
 
     QNetworkRequest req{QUrl(baseUrl + "/models")};
+    req.setTransferTimeout(120000);
     if (!apiKey.isEmpty()) {
         req.setRawHeader("Authorization", "Bearer " + apiKey.toUtf8());
     }
@@ -617,6 +620,7 @@ void AiClient::transcribeAudio(const QString &audioFilePath, TranscriptionCallba
     multiPart->append(filePart);
 
     QNetworkRequest request{QUrl(endpoint)};
+    request.setTransferTimeout(120000);
     request.setRawHeader("Authorization", "Bearer " + apiKey.toUtf8());
 
     QNetworkReply *reply = m_nam->post(request, multiPart);
