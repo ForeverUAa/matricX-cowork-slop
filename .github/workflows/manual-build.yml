@@ -51,7 +51,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build UI and Linux tool
-        run: cmake --build build --parallel 2
+        run: cmake --build build --parallel 4
       - name: Smoke test JSON-lines protocol
         if: inputs.run_smoke_tests
         run: xvfb-run -a ./scripts/smoke-test.sh
