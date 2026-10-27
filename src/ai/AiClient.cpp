@@ -6,6 +6,7 @@
 #include <QHttpPart>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 #include <QJsonArray>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -327,7 +328,17 @@ void AiClient::sendOpenAiCompatible(const QList<ChatMessage> &history,
             ToolCallRequest tcr;
             tcr.id = tc.value("id").toString();
             tcr.name = fn.value("name").toString();
-            const auto argsDoc = QJsonDocument::fromJson(fn.value("arguments").toString().toUtf8());
+            const QByteArray argsJson = fn.value("arguments").toString().toUtf8();
+            QJsonParseError argsError;
+            const QJsonDocument argsDoc = QJsonDocument::fromJson(argsJson, &argsError);
+            if (argsError.error != QJsonParseError::NoError || !argsDoc.isObject()) {
+                const QString detail = argsError.error != QJsonParseError::NoError
+                                           ? argsError.errorString()
+                                           : QString("expected a JSON object");
+                callback({false, QString(), {},
+                          QString("Invalid arguments for tool '%1': %2").arg(tcr.name, detail)});
+                return;
+            }
             tcr.arguments = argsDoc.object();
             resp.toolCalls.append(tcr);
         }
