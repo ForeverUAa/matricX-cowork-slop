@@ -95,6 +95,17 @@ jobs:
           $names = @($tools | ForEach-Object { $_.name })
           if ($names.Count -eq 0) { throw "Tool schema list is empty" }
           if (($names | Select-Object -Unique).Count -ne $names.Count) { throw "Duplicate tool names found" }
-          foreach ($expected in @("fs_list", "fs_read", "fs_write", "fs_mkdir", "fs_delete")) {
-            if ($names -notcontains $expected) { throw "Missing filesystem tool: $expected" }
+          foreach ($expected in @(
+            "screen_info",
+            "screenshot",
+            "mouse_move",
+            "mouse_click",
+            "mouse_drag",
+            "mouse_scroll",
+            "keyboard_type",
+            "keyboard_key",
+            "wait",
+            "end_session"
+          )) {
+            if ($names -notcontains $expected) { throw "Missing computer-control tool: $expected" }
           }
